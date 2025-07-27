@@ -1,36 +1,216 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AgentPad Frontend
 
-## Getting Started
+Visual flow builder for creating AI agent workflows on the SEI blockchain.
 
-First, run the development server:
+## 🏗️ Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+This is the **frontend flow builder** for AgentPad, designed to work with the standalone backend executor. The architecture follows a **decoupled approach**:
+
+- **Frontend**: Pure flow builder (Next.js + React Flow)
+- **Backend**: Standalone executor (Node.js + Docker)
+- **Database**: Supabase (PostgreSQL + Auth)
+
+## 🚀 Features
+
+- **Visual Flow Builder** - Drag-and-drop interface for creating flows
+- **Block Library** - Pre-built blocks for common operations
+- **Node Configuration** - Dynamic forms for each block type
+- **Real-time Preview** - See configuration changes instantly
+- **Flow Export/Import** - Save and load flows as JSON
+- **Authentication** - Supabase-powered user management
+- **Responsive Design** - Works on desktop and mobile
+
+## 📁 Structure
+
+```
+AgentPad-Frontend/
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── dashboard/          # Dashboard page
+│   │   ├── flow-builder/       # Flow builder page
+│   │   └── layout.tsx          # Root layout
+│   ├── components/
+│   │   ├── layout/             # Layout components
+│   │   └── flow-builder/       # Flow builder components
+│   │       ├── FlowBuilder.tsx # Main builder
+│   │       ├── BlockLibrary.tsx # Block library
+│   │       ├── FlowToolbar.tsx # Toolbar
+│   │       ├── NodePanel.tsx   # Configuration panel
+│   │       └── nodes/          # Node components
+│   ├── lib/                    # Utilities
+│   │   ├── supabase.ts         # Supabase client
+│   │   └── auth.ts             # Auth utilities
+│   └── hooks/                  # Custom hooks
+├── public/                     # Static assets
+└── package.json                # Dependencies
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Prerequisites
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Node.js 18+
+- npm or yarn
+- Supabase account
 
-## Learn More
+### Installation
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Clone the repository
+git clone <frontend-repo-url>
+cd AgentPad-Frontend
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Install dependencies
+npm install
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your Supabase configuration
+```
 
-## Deploy on Vercel
+### Environment Variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Backend Configuration (optional)
+NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
+```
+
+## 🚀 Development
+
+```bash
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+
+# Run linting
+npm run lint
+
+# Run type checking
+npm run type-check
+```
+
+## 🎨 Available Blocks
+
+### Basic Logic
+- **Conditional** - If-then-else logic with comparison operators
+- **Arithmetic** - Mathematical operations (add, subtract, multiply, divide)
+- **Variable** - Set, get, and manipulate variables
+- **Loop** - For, while, and forEach loops
+- **Timer** - Delay, interval, and timeout operations
+
+### Blockchain
+- **Blockchain** - SEI blockchain operations (balance, transfer, swap)
+
+## 🔧 Usage
+
+### Creating a Flow
+
+1. **Open Flow Builder** - Navigate to `/flow-builder`
+2. **Add Blocks** - Drag blocks from the library to the canvas
+3. **Connect Blocks** - Draw connections between block handles
+4. **Configure Blocks** - Click blocks to configure their settings
+5. **Save Flow** - Save your flow to the database or export as JSON
+
+### Block Configuration
+
+Each block type has its own configuration panel:
+
+- **Conditional**: Set comparison operator and values
+- **Arithmetic**: Choose operation and input values
+- **Variable**: Define variable name and operation
+- **Blockchain**: Configure blockchain operations and addresses
+
+## 📦 Deployment
+
+### Vercel (Recommended)
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy
+vercel
+
+# Or connect to GitHub for automatic deployments
+```
+
+### Other Platforms
+
+The frontend can be deployed to:
+- **Netlify** - Static site hosting
+- **AWS Amplify** - Full-stack hosting
+- **Google Cloud Run** - Containerized deployment
+- **Docker** - Container deployment
+
+## 🔗 Backend Integration
+
+The frontend is designed to work with the **AgentPad Backend**:
+
+1. **Build Flows** - Use the visual builder to create flows
+2. **Export JSON** - Download flow configuration as JSON
+3. **Send to Backend** - Execute flows via the backend API
+4. **View Results** - Monitor execution results and logs
+
+### Backend Communication
+
+```javascript
+// Example: Execute a flow
+const response = await fetch('http://localhost:3001/api/execute', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    flow: flowData,
+    environment: {
+      variables: {}
+    }
+  })
+});
+```
+
+## 🔒 Security
+
+- **Client-side Only** - No sensitive operations in frontend
+- **Environment Variables** - Secure configuration management
+- **Supabase Auth** - Secure user authentication
+- **CORS Protection** - Configured for backend communication
+
+## 🧪 Testing
+
+```bash
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+MIT License - see LICENSE file for details.
+
+## 🔗 Related Repositories
+
+- **[AgentPad Backend](https://github.com/your-org/agentpad-backend)** - Standalone execution engine
+- **[sei-agent-kit](https://github.com/sei-protocol/sei-agent-kit)** - SEI blockchain integration

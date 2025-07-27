@@ -1,28 +1,98 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { auth } from '../lib/auth';
+import { useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+
+interface AuthState {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+}
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    session: null,
+    loading: true,
+  });
 
   useEffect(() => {
-    // Get initial user
-    auth.getCurrentUser().then(({ user }) => {
-      setUser(user);
-      setLoading(false);
-    });
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setAuthState({
+        user: session?.user ?? null,
+        session,
+        loading: false,
+      });
+    };
+
+    getInitialSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = auth.onAuthStateChange((event: string, session: Session | null) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setAuthState({
+          user: session?.user ?? null,
+          session,
+          loading: false,
+        });
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
 
-  return { user, loading };
+  const signIn = async (email: string, password: string) => {
+    console.log('useAuth signIn called with:', { email, password: password ? '[HIDDEN]' : 'empty' });
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    console.log('Supabase signIn response:', { data, error });
+    return { data, error };
+  };
+
+  const signUp = async (email: string, password: string, userData: {
+    first_name: string;
+    last_name: string;
+  }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: userData,
+      },
+    });
+    return { data, error };
+  };
+
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    return { error };
+  };
+
+  const resetPassword = async (email: string) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+    return { data, error };
+  };
+
+  const updatePassword = async (password: string) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password,
+    });
+    return { data, error };
+  };
+
+  return {
+    ...authState,
+    signIn,
+    signUp,
+    signOut,
+    resetPassword,
+    updatePassword,
+  };
 } 

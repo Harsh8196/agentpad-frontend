@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -26,6 +26,17 @@ import VariableNode from './nodes/VariableNode';
 import LoopNode from './nodes/LoopNode';
 import TimerNode from './nodes/TimerNode';
 import BlockchainNode from './nodes/BlockchainNode';
+import StartNode from './nodes/StartNode';
+import { z } from 'zod';
+import { useAuth } from '../../../hooks/useAuth';
+import { supabase } from '../../../lib/supabase';
+
+interface VariableDeclaration {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  defaultValue?: string;
+  description?: string;
+}
 
 // Define node types
 const nodeTypes: NodeTypes = {
@@ -36,7 +47,33 @@ const nodeTypes: NodeTypes = {
   loop: LoopNode,
   timer: TimerNode,
   blockchain: BlockchainNode,
+  start: StartNode,
 };
+
+// Define the flow schema
+const flowSchema = z.object({
+  nodes: z.array(z.object({
+    id: z.string(),
+    type: z.string(),
+    position: z.object({ x: z.number(), y: z.number() }),
+    data: z.object({
+      label: z.string(),
+      type: z.string(),
+      config: z.record(z.string(), z.any()),
+      description: z.string(),
+      status: z.string(),
+    }),
+  })),
+  edges: z.array(z.object({
+    id: z.string(),
+    source: z.string(),
+    target: z.string(),
+    type: z.string().optional(),
+    label: z.string().optional(),
+    data: z.record(z.string(), z.any()).optional(),
+  })),
+  timestamp: z.string(),
+});
 
 const FlowBuilder: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -45,7 +82,17 @@ const FlowBuilder: React.FC = () => {
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
   const [isLibraryCollapsed, setIsLibraryCollapsed] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [flowName, setFlowName] = useState('');
+  const [flowDescription, setFlowDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
+  const [currentFlowName, setCurrentFlowName] = useState('Untitled Flow');
+  const [isNewFlow, setIsNewFlow] = useState(true);
+  const [availableVariables, setAvailableVariables] = useState<string[]>([]);
+  const [declaredVariables, setDeclaredVariables] = useState<VariableDeclaration[]>([]);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
   // Handle edge connections
   const onConnect = useCallback(
@@ -81,12 +128,14 @@ const FlowBuilder: React.FC = () => {
             operator: 'equals',
             value1: '',
             value2: '',
+            outputVariable: '',
           };
         case 'arithmetic':
           return {
             operation: 'add',
             value1: '',
             value2: '',
+            outputVariable: '',
           };
         case 'variable':
           return {
@@ -101,14 +150,23 @@ const FlowBuilder: React.FC = () => {
           };
         case 'timer':
           return {
+            timerType: 'delay',
             duration: 1000,
             unit: 'ms',
+            repeatCount: -1,
+            timeoutAction: 'continue',
+            outputVariable: '',
           };
         case 'blockchain':
           return {
             operation: 'getBalance',
             address: '',
             token: '',
+            outputVariable: '',
+          };
+        case 'start':
+          return {
+            variables: [],
           };
         default:
           return {};
@@ -180,7 +238,7 @@ const FlowBuilder: React.FC = () => {
   }, [setNodes, setEdges]);
 
   // Handle keyboard shortcuts
-  const onKeyDown = useCallback((event: KeyboardEvent) => {
+  const onKeyDown = useCallback((event: React.KeyboardEvent) => {
     if (event.key === 'Delete') {
       if (selectedNode) {
         onNodeDelete(selectedNode);
@@ -216,90 +274,649 @@ const FlowBuilder: React.FC = () => {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  // Update existing flow
+  const handleUpdateFlow = useCallback(async () => {
+    if (!user || !currentFlowId) {
+      alert('No flow to update');
+      return;
+    }
+
+    // Validate node configurations before updating
+    const validationErrors = validateNodeConfigurations();
+    if (validationErrors.length > 0) {
+      const errorMessage = 'Flow validation failed:\n\n' + validationErrors.join('\n');
+      alert(errorMessage);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const flowData = {
+        nodes,
+        edges,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Validate flow data
+      const result = flowSchema.safeParse(flowData);
+      if (!result.success) {
+        alert('Flow is invalid!\n' + JSON.stringify(result.error.issues, null, 2));
+        return;
+      }
+
+      const { error } = await supabase
+        .from('flows')
+        .update({
+          flow_data: flowData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentFlowId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error updating flow:', error);
+        alert('Failed to update flow: ' + error.message);
+        return;
+      }
+
+      alert('Flow updated successfully!');
+    } catch (error) {
+      console.error('Error updating flow:', error);
+      alert('Failed to update flow');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user, currentFlowId, nodes, edges]);
+
   // Save flow
   const onSaveFlow = useCallback(() => {
+    if (!user) {
+      alert('Please log in to save flows');
+      return;
+    }
+    
+    // If we have a current flow ID, update the existing flow
+    if (currentFlowId) {
+      handleUpdateFlow();
+    } else {
+      // Show save dialog for new flows
+      setShowSaveDialog(true);
+    }
+  }, [user, currentFlowId, handleUpdateFlow]);
+
+  const handleSaveFlow = useCallback(async () => {
+    if (!user || !flowName.trim()) {
+      alert('Please provide a flow name');
+      return;
+    }
+
+    // Validate node configurations before saving
+    const validationErrors = validateNodeConfigurations();
+    if (validationErrors.length > 0) {
+      const errorMessage = 'Flow validation failed:\n\n' + validationErrors.join('\n');
+      alert(errorMessage);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
     const flowData = {
       nodes,
       edges,
       timestamp: new Date().toISOString(),
     };
     
-    // For now, just log the flow data
-    console.log('Saving flow:', flowData);
-    
-    // TODO: Implement save to database
-    alert('Flow saved! (Console log for now)');
-  }, [nodes, edges]);
+      // Validate flow data
+      const result = flowSchema.safeParse(flowData);
+      if (!result.success) {
+        alert('Flow is invalid!\n' + JSON.stringify(result.error.issues, null, 2));
+        return;
+      }
 
-  // Load flow
-  const onLoadFlow = useCallback(() => {
-    // TODO: Implement load from database
-    alert('Load flow functionality coming soon!');
+      const { data, error } = await supabase
+        .from('flows')
+        .insert({
+          user_id: user.id,
+          name: flowName.trim(),
+          description: flowDescription.trim() || null,
+          flow_data: flowData
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving flow:', error);
+        alert('Failed to save flow: ' + error.message);
+        return;
+      }
+
+      alert('Flow saved successfully!');
+      setShowSaveDialog(false);
+      setCurrentFlowId(data.id);
+      setCurrentFlowName(flowName.trim());
+      setIsNewFlow(false);
+      // Do NOT clear flowName/flowDescription here
+    } catch (error) {
+      console.error('Error saving flow:', error);
+      alert('Failed to save flow');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user, flowName, flowDescription, nodes, edges]);
+
+
+
+  // Extract variables from flow nodes
+  const extractVariablesFromFlow = useCallback((flowNodes: Node[]) => {
+    const variables: string[] = [];
+    flowNodes.forEach(node => {
+      if (node.type === 'variable' && node.data.config.variableName) {
+        variables.push(node.data.config.variableName);
+      }
+    });
+    return variables;
   }, []);
+
+  // Add new variable to available variables
+  const addVariable = useCallback((variableName: string) => {
+    if (!availableVariables.includes(variableName)) {
+      setAvailableVariables(prev => [...prev, variableName]);
+    }
+  }, [availableVariables]);
+
+  const handleVariablesChange = useCallback((variables: VariableDeclaration[]) => {
+    setDeclaredVariables(variables);
+    // Update available variables list from declared variables
+    const variableNames = variables.map(v => v.name);
+    setAvailableVariables(variableNames);
+    
+    // Update the Start node's config with the new variables
+    setNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.type === 'start'
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                config: {
+                  ...node.data.config,
+                  variables: variables,
+                },
+              },
+            }
+          : node
+      )
+    );
+  }, [setNodes]);
+
+  // Create start node for new flows
+  const createStartNode = useCallback(() => {
+    const startNode = {
+      id: 'start-node',
+      type: 'start',
+      position: { x: 50, y: 200 },
+      data: {
+        label: 'Start',
+        type: 'start',
+        config: {
+          variables: [],
+        },
+        description: 'Flow execution starts here',
+        status: 'ready',
+      },
+    };
+    return startNode;
+  }, []);
+
+  // Load flow on component mount
+  useEffect(() => {
+    try {
+      const selectedFlow = localStorage.getItem('selectedFlow');
+      console.log('Selected flow from localStorage:', selectedFlow);
+      
+      if (selectedFlow) {
+        const flow = JSON.parse(selectedFlow);
+        console.log('Parsed flow data:', flow);
+        console.log('Flow name:', flow.name);
+        console.log('Flow ID:', flow.id);
+        
+        setNodes(flow.flow_data.nodes || []);
+        setEdges(flow.flow_data.edges || []);
+        setCurrentFlowId(flow.id);
+        setCurrentFlowName(flow.name);
+        setFlowName(flow.name);
+        setFlowDescription(flow.description || '');
+        setIsNewFlow(false);
+        
+        // Extract variables from existing flow
+        const variables = extractVariablesFromFlow(flow.flow_data.nodes || []);
+        setAvailableVariables(variables);
+        
+        // Load declared variables from Start node
+        const startNode = flow.flow_data.nodes?.find((node: any) => node.type === 'start');
+        if (startNode?.data?.config?.variables) {
+          setDeclaredVariables(startNode.data.config.variables);
+          // Also update available variables from declared variables
+          const variableNames = startNode.data.config.variables.map((v: VariableDeclaration) => v.name);
+          setAvailableVariables(variableNames);
+        }
+        
+        console.log('Set currentFlowName to:', flow.name);
+        console.log('Set isNewFlow to: false');
+        // Do NOT remove from localStorage here
+      } else {
+        console.log('No flow selected, setting up new flow');
+        // No flow selected, this is a new flow
+        setIsNewFlow(true);
+        setCurrentFlowId(null);
+        setCurrentFlowName('Untitled Flow');
+        setFlowName('');
+        setFlowDescription('');
+        
+        // Add start node for new flows
+        const startNode = createStartNode();
+        setNodes([startNode]);
+        setEdges([]);
+      }
+    } catch (error) {
+      console.error('Error loading flow from storage:', error);
+    }
+  }, [createStartNode]); // Add createStartNode to dependencies
 
   // Clear canvas
   const onClearCanvas = useCallback(() => {
     if (confirm('Are you sure you want to clear the canvas?')) {
-      setNodes([]);
+      const startNode = createStartNode();
+      setNodes([startNode]);
       setEdges([]);
       setSelectedNode(null);
       setSelectedEdge(null);
+      setAvailableVariables([]);
+      setDeclaredVariables([]);
+      // Reset flow state to new flow
+      setIsNewFlow(true);
+      setCurrentFlowId(null);
+      setCurrentFlowName('Untitled Flow');
+      setFlowName('');
+      setFlowDescription('');
     }
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, createStartNode]);
+
+  // Helper function to validate if a value is valid (declared variable or direct value)
+  const isValidValue = useCallback((value: any, expectedType?: string): boolean => {
+    // Handle null, undefined, or empty values
+    if (value === null || value === undefined) return false;
+    
+    // Convert to string for validation
+    const stringValue = String(value);
+    if (!stringValue || !stringValue.trim()) return false;
+    
+    const trimmedValue = stringValue.trim();
+    
+    // Check if it's a declared variable
+    const isDeclaredVariable = declaredVariables.some(v => v.name === trimmedValue);
+    if (isDeclaredVariable) return true;
+    
+    // For constants, be more lenient - accept any non-empty value
+    // Only apply strict type checking if expectedType is specified
+    if (expectedType) {
+      // Check for boolean values
+      if (expectedType === 'boolean' && ['true', 'false', '0', '1'].includes(trimmedValue.toLowerCase())) {
+        return true;
+      }
+      
+      // Check for numbers
+      if (expectedType === 'number' && !isNaN(Number(trimmedValue)) && trimmedValue !== '') {
+        return true;
+      }
+      
+      // Check for strings (anything that's not empty)
+      if (expectedType === 'string' && trimmedValue.length > 0) {
+        return true;
+      }
+      
+      // For other types, accept any non-empty value
+      return trimmedValue.length > 0;
+    }
+    
+    // If no expected type, accept any non-empty value
+    return trimmedValue.length > 0;
+  }, [declaredVariables]);
+
+  // Validate all node configurations
+  const validateNodeConfigurations = useCallback(() => {
+    const errors: string[] = [];
+    
+    nodes.forEach((node, index) => {
+      if (node.type === 'start') {
+        // Start node doesn't need validation
+        return;
+      }
+      
+      const config = node.data.config || {};
+      const nodeName = node.data.label || `Node ${index + 1}`;
+      
+      // Check if node has input connections (except start node)
+      const hasInputConnection = edges.some(edge => edge.target === node.id);
+      if (!hasInputConnection) {
+        errors.push(`${nodeName}: Missing input connection`);
+      }
+      
+      switch (node.type) {
+        case 'conditional':
+          if (!isValidValue(config.value1)) {
+            errors.push(`${nodeName}: Value 1 is required (use constant or variable)`);
+          }
+          if (!isValidValue(config.value2)) {
+            errors.push(`${nodeName}: Value 2 is required (use constant or variable)`);
+          }
+          if (config.outputVariable && !isValidValue(config.outputVariable, 'boolean')) {
+            errors.push(`${nodeName}: Output variable must be a declared boolean variable`);
+          }
+          break;
+          
+        case 'arithmetic':
+          if (!isValidValue(config.value1, 'number')) {
+            errors.push(`${nodeName}: Value 1 must be a number (use constant or number variable)`);
+          }
+          if (!isValidValue(config.value2, 'number')) {
+            errors.push(`${nodeName}: Value 2 must be a number (use constant or number variable)`);
+          }
+          if (config.outputVariable && !isValidValue(config.outputVariable, 'number')) {
+            errors.push(`${nodeName}: Output variable must be a declared number variable`);
+          }
+          break;
+          
+        case 'variable':
+          if (!isValidValue(config.variableName)) {
+            errors.push(`${nodeName}: Variable name must be a declared variable`);
+          }
+          if (config.operation === 'set' && !isValidValue(config.value)) {
+            errors.push(`${nodeName}: Value must be a declared variable or valid value for 'set' operation`);
+          }
+          break;
+          
+        case 'loop':
+          if (config.loopType === 'while' && !isValidValue(config.condition, 'boolean')) {
+            errors.push(`${nodeName}: Condition must be a declared boolean variable or valid boolean value`);
+          }
+          if (config.loopType === 'for' && !isValidValue(config.startValue, 'number')) {
+            errors.push(`${nodeName}: Start value must be a declared number variable or numeric value`);
+          }
+          if (config.loopType === 'for' && !isValidValue(config.endValue, 'number')) {
+            errors.push(`${nodeName}: End value must be a declared number variable or numeric value`);
+          }
+          if (config.loopType === 'foreach' && !isValidValue(config.collection, 'array')) {
+            errors.push(`${nodeName}: Collection must be a declared array variable`);
+          }
+          break;
+          
+        case 'timer':
+          if (!isValidValue(config.duration, 'number')) {
+            errors.push(`${nodeName}: Duration must be a number greater than 0 (use constant or number variable)`);
+          }
+          if (config.outputVariable && !isValidValue(config.outputVariable, 'number')) {
+            errors.push(`${nodeName}: Output variable must be a declared number variable`);
+          }
+          break;
+          
+        case 'blockchain':
+          if (config.operation === 'getBalance' && !isValidValue(config.address, 'string')) {
+            errors.push(`${nodeName}: Address must be a declared string variable or valid address`);
+          }
+          if (config.operation === 'transfer' && !isValidValue(config.address, 'string')) {
+            errors.push(`${nodeName}: Address must be a declared string variable or valid address`);
+          }
+          if (config.operation === 'transfer' && !isValidValue(config.amount, 'number')) {
+            errors.push(`${nodeName}: Amount must be a declared number variable or numeric value greater than 0`);
+          }
+          if (config.outputVariable && !isValidValue(config.outputVariable)) {
+            errors.push(`${nodeName}: Output variable must be a declared variable`);
+          }
+          break;
+          
+        case 'custom':
+          // Custom nodes might have custom validation requirements
+          // For now, we'll assume they're valid if they have any config
+          if (!config || Object.keys(config).length === 0) {
+            errors.push(`${nodeName}: Configuration is required`);
+          }
+          break;
+      }
+    });
+    
+    return errors;
+  }, [nodes, edges, isValidValue]);
+
+  const onDownloadFlow = useCallback(() => {
+    // First validate node configurations
+    const validationErrors = validateNodeConfigurations();
+    if (validationErrors.length > 0) {
+      const errorMessage = 'Flow validation failed:\n\n' + validationErrors.join('\n');
+      alert(errorMessage);
+      return;
+    }
+    
+    const flowData = {
+      name: currentFlowName,
+      description: flowDescription,
+      nodes,
+      edges,
+      timestamp: new Date().toISOString(),
+    };
+    const result = flowSchema.safeParse(flowData);
+    if (!result.success) {
+      alert('Flow is invalid!\n' + JSON.stringify(result.error.issues, null, 2));
+      return;
+    }
+    const blob = new Blob([JSON.stringify(flowData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentFlowName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [nodes, edges, currentFlowName, flowDescription, validateNodeConfigurations]);
+
+  const onAddToTemplateLibrary = useCallback(async () => {
+    if (!user) {
+      alert('Please log in to add flows to template library');
+      return;
+    }
+
+    if (user.user_metadata?.role !== 'admin') {
+      alert('Only admins can add flows to template library');
+      return;
+    }
+
+    const templateName = prompt('Enter template name:');
+    if (!templateName?.trim()) {
+      alert('Template name is required');
+      return;
+    }
+
+    const templateDescription = prompt('Enter template description (optional):');
+
+    // Validate node configurations before adding to template library
+    const validationErrors = validateNodeConfigurations();
+    if (validationErrors.length > 0) {
+      const errorMessage = 'Flow validation failed:\n\n' + validationErrors.join('\n');
+      alert(errorMessage);
+      return;
+    }
+
+    try {
+      const flowData = {
+        nodes,
+        edges,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Validate flow data
+      const result = flowSchema.safeParse(flowData);
+      if (!result.success) {
+        alert('Flow is invalid!\n' + JSON.stringify(result.error.issues, null, 2));
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('templates')
+        .insert({
+          name: templateName.trim(),
+          description: templateDescription?.trim() || null,
+          category: 'Custom', // Default category, can be made configurable
+          flow_data: flowData,
+          is_official: false,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving template:', error);
+        alert('Failed to save template: ' + error.message);
+        return;
+      }
+
+      alert('Template added to library successfully!');
+    } catch (error) {
+      console.error('Error saving template:', error);
+      alert('Failed to save template');
+    }
+  }, [user, nodes, edges]);
 
   return (
-    <div className="h-screen flex">
-      {/* Block Library */}
-      <BlockLibrary
-        isOpen={isLibraryOpen}
-        isCollapsed={isLibraryCollapsed}
-        onToggleCollapse={() => setIsLibraryCollapsed(!isLibraryCollapsed)}
-        onAddNode={onAddNode}
-      />
-
-      {/* Main Flow Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Toolbar */}
-        <FlowToolbar
-          onSave={onSaveFlow}
-          onLoad={onLoadFlow}
-          onClear={onClearCanvas}
-          onRun={() => alert('Run functionality coming in Phase 2!')}
-          isExecuting={false}
+    <div className="h-screen flex flex-col bg-gray-900">
+      {/* Top Section */}
+      <div className="flex flex-1">
+        {/* Block Library */}
+        <BlockLibrary
+          isOpen={isLibraryOpen}
+          isCollapsed={isLibraryCollapsed}
+          onToggleCollapse={() => setIsLibraryCollapsed(!isLibraryCollapsed)}
+          onAddNode={onAddNode}
         />
 
-        {/* React Flow Canvas */}
-        <div className="flex-1" ref={reactFlowWrapper}>
-          <ReactFlowProvider>
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onNodeClick={onNodeClick}
-              onEdgeClick={onEdgeClick}
-              onPaneClick={onPaneClick}
-              onKeyDown={onKeyDown}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              nodeTypes={nodeTypes}
-              fitView
-              attributionPosition="bottom-left"
-            >
-              <Controls />
-              <Background />
-              <MiniMap />
-            </ReactFlow>
-          </ReactFlowProvider>
+        {/* Main Flow Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Toolbar */}
+          <FlowToolbar
+            onSave={onSaveFlow}
+            onClear={onClearCanvas}
+            onRunFlow={() => alert('Run functionality coming in Phase 2!')}
+            isExecuting={false}
+            onDownload={onDownloadFlow}
+            currentFlowName={currentFlowName}
+            isNewFlow={isNewFlow}
+            isSaving={isSaving}
+            validationErrors={validateNodeConfigurations()}
+          />
+          {/* Admin-only: Add to Template Library */}
+          {user?.user_metadata?.role === 'admin' && (
+            <div className="p-4">
+              <button
+                onClick={onAddToTemplateLibrary}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Add to Template Library
+              </button>
+            </div>
+          )}
+
+          {/* Save Flow Dialog */}
+          {showSaveDialog && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[99999]">
+              <div className="bg-gray-800 rounded-xl p-6 w-96 max-w-full mx-4">
+                <h3 className="text-lg font-semibold text-white mb-4">Save Flow</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Flow Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={flowName}
+                      onChange={(e) => setFlowName(e.target.value)}
+                      placeholder="Enter flow name"
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Description (optional)
+                    </label>
+                    <textarea
+                      value={flowDescription}
+                      onChange={(e) => setFlowDescription(e.target.value)}
+                      placeholder="Enter flow description"
+                      rows={3}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex space-x-3 pt-4">
+                    <button
+                      onClick={handleSaveFlow}
+                      disabled={isSaving || !flowName.trim()}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isSaving ? 'Saving...' : 'Save Flow'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowSaveDialog(false);
+                        if (!currentFlowId) {
+                          setFlowName('');
+                          setFlowDescription('');
+                        }
+                      }}
+                      className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* React Flow Canvas */}
+          <div className="flex-1" ref={reactFlowWrapper}>
+            <ReactFlowProvider>
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={onNodeClick}
+                onEdgeClick={onEdgeClick}
+                onPaneClick={onPaneClick}
+                onKeyDown={onKeyDown}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                nodeTypes={nodeTypes}
+                fitView
+                attributionPosition="bottom-left"
+                className="dark"
+                style={{ zIndex: 1 }}
+              >
+                <Controls className="dark" />
+                <Background color="#374151" gap={20} />
+                <MiniMap className="dark" />
+              </ReactFlow>
+            </ReactFlowProvider>
+          </div>
         </div>
       </div>
 
-      {/* Node Configuration Panel */}
+      {/* Node Configuration Panel - Bottom */}
       <NodePanel
         selectedNode={selectedNode}
         selectedEdge={selectedEdge}
         onNodeDataChange={onNodeDataChange}
+        availableVariables={availableVariables}
+        onAddVariable={addVariable}
+        declaredVariables={declaredVariables}
+        onVariablesChange={handleVariablesChange}
       />
     </div>
   );

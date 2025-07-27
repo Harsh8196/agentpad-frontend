@@ -1,0 +1,112 @@
+{
+  "name": "Validation Test Flow",
+  "description": "Test flow to demonstrate variable validation system",
+  "nodes": [
+    {
+      "id": "start-node",
+      "type": "start",
+      "position": { "x": 50, "y": 200 },
+      "data": {
+        "label": "Start",
+        "type": "start",
+        "config": {
+          "variables": [
+            {
+              "name": "counter",
+              "type": "number",
+              "defaultValue": "0",
+              "description": "Loop counter"
+            },
+            {
+              "name": "price",
+              "type": "number",
+              "defaultValue": "50000",
+              "description": "Crypto price"
+            },
+            {
+              "name": "isActive",
+              "type": "boolean",
+              "defaultValue": "true",
+              "description": "Active status"
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "defaultValue": "Hello",
+              "description": "User message"
+            }
+          ]
+        },
+        "description": "Flow execution starts here",
+        "status": "ready"
+      }
+    },
+    {
+      "id": "arithmetic-1",
+      "type": "arithmetic",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "label": "Increment Counter",
+        "type": "arithmetic",
+        "config": {
+          "operation": "add",
+          "value1": "counter",
+          "value2": "1",
+          "outputVariable": "counter"
+        },
+        "description": "Increment the counter",
+        "status": "idle"
+      }
+    },
+    {
+      "id": "conditional-1",
+      "type": "conditional",
+      "position": { "x": 550, "y": 100 },
+      "data": {
+        "label": "Check Price",
+        "type": "conditional",
+        "config": {
+          "operator": "greater",
+          "value1": "price",
+          "value2": "60000",
+          "outputVariable": "isActive"
+        },
+        "description": "Check if price is high",
+        "status": "idle"
+      }
+    },
+    {
+      "id": "variable-1",
+      "type": "variable",
+      "position": { "x": 800, "y": 100 },
+      "data": {
+        "label": "Set Message",
+        "type": "variable",
+        "config": {
+          "operation": "set",
+          "variableName": "message",
+          "value": "Price is high!"
+        },
+        "description": "Set status message",
+        "status": "idle"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start-node",
+      "target": "arithmetic-1"
+    },
+    {
+      "id": "e2",
+      "source": "arithmetic-1",
+      "target": "conditional-1"
+    },
+    {
+      "id": "e3",
+      "source": "conditional-1",
+      "target": "variable-1"
+    }
+  ]
+} 

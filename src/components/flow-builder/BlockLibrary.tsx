@@ -148,17 +148,17 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${
+    <div className={`bg-gray-800/50 border-r border-gray-700 flex flex-col transition-all duration-300 backdrop-blur-sm ${
       isCollapsed ? 'w-12' : 'w-80'
     }`}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+      <div className="p-4 border-b border-gray-700 flex items-center justify-between">
         {!isCollapsed && (
           <>
-            <h2 className="text-lg font-semibold text-gray-900">Block Library</h2>
+            <h2 className="text-lg font-semibold text-white">Block Library</h2>
             <button
               onClick={onToggleCollapse}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-gray-700/50 rounded text-gray-400 hover:text-gray-300 transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -167,7 +167,7 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
         {isCollapsed && (
           <button
             onClick={onToggleCollapse}
-            className="p-1 hover:bg-gray-100 rounded mx-auto"
+            className="p-1 hover:bg-gray-700/50 rounded mx-auto text-gray-400 hover:text-gray-300 transition-colors"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -177,15 +177,15 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
       {!isCollapsed && (
         <>
           {/* Search */}
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-700">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search blocks..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200"
               />
             </div>
           </div>
@@ -196,8 +196,8 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
               {filteredCategories.map((category) => (
                 <div key={category.id} className="mb-6">
                   <div className="flex items-center mb-3">
-                    <category.icon className="h-5 w-5 text-gray-600 mr-2" />
-                    <h3 className="text-sm font-medium text-gray-900">{category.name}</h3>
+                    <category.icon className="h-5 w-5 text-gray-400 mr-2" />
+                    <h3 className="text-sm font-medium text-white">{category.name}</h3>
                   </div>
                   <div className="space-y-2">
                     {category.blocks.map((block) => (
@@ -207,7 +207,7 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
                         onDragStart={(e) => handleDragStart(e, block)}
                         onDragEnd={handleDragEnd}
                         onClick={() => handleBlockClick(block)}
-                        className={`p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors ${
+                        className={`p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-500/10 transition-colors ${
                           draggedBlock?.id === block.id ? 'opacity-50' : ''
                         }`}
                       >
@@ -216,8 +216,8 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
                             <block.icon className="h-4 w-4 text-white" />
                           </div>
                           <div className="flex-1">
-                            <h4 className="text-sm font-medium text-gray-900">{block.name}</h4>
-                            <p className="text-xs text-gray-600 mt-1">{block.description}</p>
+                            <h4 className="text-sm font-medium text-white">{block.name}</h4>
+                            <p className="text-xs text-gray-400 mt-1">{block.description}</p>
                           </div>
                         </div>
                       </div>
