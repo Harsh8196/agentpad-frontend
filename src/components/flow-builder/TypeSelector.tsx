@@ -97,6 +97,7 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
   };
 
   const handleVariableSelect = (variableName: string) => {
+    console.log('handleVariableSelect', variableName);
     setInputValue(variableName);
     onChange(variableName);
     setIsOpen(false);
@@ -176,89 +177,23 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
   };
 
   return (
-    <div className={`relative ${className}`} ref={dropdownRef}>
-      <input
-        type="text"
-        value={inputValue}
-        onChange={handleInputChange}
-        onFocus={() => setIsOpen(true)}
-        onBlur={handleBlur}
-        placeholder={placeholder}
-        className={`w-full bg-gray-700 border ${getInputBorderColor()} rounded px-3 py-2 text-sm ${getInputTextColor()} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-      />
-      
-      {isOpen && (
-        <div 
-          className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-          onScroll={handleScroll}
-        >
-          {/* Variable options */}
-          {filteredVariables.length > 0 && (
-            <div className="p-2">
-              <div className="text-xs text-gray-400 mb-2 px-2">Variables</div>
-              {filteredVariables.map((variable) => (
-                <button
-                  key={variable.name}
-                  onClick={() => handleVariableSelect(variable.name)}
-                  className="w-full text-left px-2 py-1 hover:bg-gray-700 rounded text-sm flex items-center justify-between"
-                >
-                  <span className="text-green-300">{variable.name}</span>
-                  <span className="text-xs text-gray-500">{variable.type}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          
-          {/* Create new variable option */}
-          {inputValue && (() => {
-            const stringValue = String(inputValue);
-            if (!stringValue || !stringValue.trim()) return null;
-            
-            const trimmedValue = stringValue.trim();
-            if (isValidVariableName(trimmedValue) && !variables.some(v => v.name === trimmedValue)) {
-              return (
-                <div className="border-t border-gray-600 p-2">
-                  <button
-                    onClick={() => handleVariableSelect(trimmedValue)}
-                    className="w-full text-left px-2 py-1 hover:bg-gray-700 rounded text-sm text-blue-300"
-                  >
-                    Create variable "{trimmedValue}"
-                  </button>
-                </div>
-              );
-            }
-            return null;
-          })()}
-          
-          {/* Type validation message */}
-          {inputValue && !isValidValue(inputValue) && expectedType && (
-            <div className="border-t border-gray-600 p-2">
-              <div className="text-xs text-red-400">
-                Invalid {expectedType} value
-              </div>
-            </div>
-          )}
-          
-          {/* Type mismatch warning */}
-          {inputValue && (() => {
-            const stringValue = String(inputValue);
-            if (!stringValue || !stringValue.trim()) return null;
-            
-            const trimmedValue = stringValue.trim();
-            const matchingVariable = variables.find(v => v.name === trimmedValue);
-            if (matchingVariable && expectedType && matchingVariable.type !== expectedType) {
-              return (
-                <div className="border-t border-gray-600 p-2">
-                  <div className="text-xs text-orange-400">
-                    Variable "{trimmedValue}" is {matchingVariable.type}, expected {expectedType}
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
-        </div>
-      )}
+    <div className={`relative ${className}`}>
+      <select
+        value={value}
+        onChange={(e) => {
+          console.log('Select changed:', e.target.value);
+          onChange(e.target.value);
+        }}
+        className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        style={{ colorScheme: 'dark' }}
+      >
+        <option value="">{placeholder}</option>
+        {filteredVariables.map((variable) => (
+          <option key={variable.name} value={variable.name} className="bg-gray-700 text-white">
+            {variable.name} ({variable.type})
+          </option>
+        ))}
+      </select>
     </div>
   );
 };

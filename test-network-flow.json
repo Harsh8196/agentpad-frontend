@@ -1,0 +1,86 @@
+{
+  "name": "Frontend Network Test Flow",
+  "nodes": [
+    {
+      "id": "start-1",
+      "type": "start",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "label": "Start",
+        "type": "start",
+        "config": {
+          "variables": [
+            {
+              "name": "testBalance",
+              "type": "string",
+              "defaultValue": "",
+              "description": "Test balance result"
+            },
+            {
+              "name": "aiAnalysis",
+              "type": "string",
+              "defaultValue": "",
+              "description": "AI analysis result"
+            }
+          ]
+        },
+        "description": "Flow execution starts here",
+        "status": "idle"
+      }
+    },
+    {
+      "id": "blockchain-1",
+      "type": "blockchain",
+      "position": { "x": 350, "y": 100 },
+      "data": {
+        "label": "Blockchain Operation",
+        "type": "blockchain",
+        "config": {
+          "network": "testnet",
+          "selectedTool": "sei_erc20_balance",
+          "toolParameters": {
+            "ticker": "SEI"
+          },
+          "outputVariable": "testBalance"
+        },
+        "description": "Execute SEI blockchain operations",
+        "status": "idle"
+      }
+    },
+    {
+      "id": "llm-1",
+      "type": "llm",
+      "position": { "x": 600, "y": 100 },
+      "data": {
+        "label": "AI Assistant",
+        "type": "llm",
+        "config": {
+          "prompt": "Analyze the balance result and provide insights",
+          "input": "The balance result is: {{testBalance}}",
+          "outputVariable": "aiAnalysis",
+          "chatInterface": false,
+          "model": "gpt-4-turbo",
+          "temperature": 0.7
+        },
+        "description": "Use AI to analyze and make decisions",
+        "status": "idle"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "start-1",
+      "target": "blockchain-1",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "edge-2",
+      "source": "blockchain-1",
+      "target": "llm-1",
+      "sourceHandle": null,
+      "targetHandle": null
+    }
+  ]
+} 

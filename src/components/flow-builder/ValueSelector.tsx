@@ -20,7 +20,7 @@ interface ValueSelectorProps {
   label?: string;
 }
 
-const ValueSelector: React.FC<ValueSelectorProps> = ({
+const  ValueSelector: React.FC<ValueSelectorProps> = ({
   value,
   onChange,
   variables,
@@ -73,6 +73,7 @@ const ValueSelector: React.FC<ValueSelectorProps> = ({
 
   // Handle variable value change
   const handleVariableChange = (newValue: string) => {
+    console.log('handleVariableChange', newValue);
     setVariableValue(newValue);
     onChange(newValue);
   };
@@ -121,7 +122,7 @@ const ValueSelector: React.FC<ValueSelectorProps> = ({
       ) : (
         <TypeSelector
           value={variableValue}
-          onChange={handleVariableChange}
+          onChange={(value) => handleVariableChange(value)}
           variables={variables}
           expectedType={expectedType}
           placeholder="Select variable"

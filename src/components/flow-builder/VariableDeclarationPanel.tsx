@@ -35,6 +35,7 @@ const VariableDeclarationPanel: React.FC<VariableDeclarationPanelProps> = ({
       description: newVariable.description || undefined,
     };
 
+    console.log('VariableDeclarationPanel addVariable called:', variable);
     onVariablesChange([...variables, variable]);
     setNewVariable({
       name: '',

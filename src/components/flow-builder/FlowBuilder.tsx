@@ -27,6 +27,7 @@ import LoopNode from './nodes/LoopNode';
 import TimerNode from './nodes/TimerNode';
 import BlockchainNode from './nodes/BlockchainNode';
 import StartNode from './nodes/StartNode';
+import LLMNode from './nodes/LLMNode';
 import { z } from 'zod';
 import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
@@ -48,6 +49,7 @@ const nodeTypes: NodeTypes = {
   timer: TimerNode,
   blockchain: BlockchainNode,
   start: StartNode,
+  llm: LLMNode,
 };
 
 // Define the flow schema
@@ -159,18 +161,55 @@ const FlowBuilder: React.FC = () => {
           };
         case 'blockchain':
           return {
-            operation: 'getBalance',
-            address: '',
-            token: '',
+            network: 'mainnet',
+            selectedTool: '',
+            toolParameters: {},
             outputVariable: '',
           };
         case 'start':
           return {
             variables: [],
           };
+        case 'llm':
+          return {
+            prompt: '',
+            input: '',
+            outputVariable: '',
+            chatInterface: false,
+            model: 'gpt-4-turbo',
+            temperature: 0,
+          };
         default:
           return {};
       }
+    };
+
+    const getNodeLabel = (type: string) => {
+      const labels: Record<string, string> = {
+        'start': 'Start',
+        'conditional': 'Conditional',
+        'arithmetic': 'Arithmetic',
+        'variable': 'Variable',
+        'loop': 'Loop',
+        'timer': 'Timer',
+        'blockchain': 'Blockchain Operation',
+        'llm': 'AI Assistant',
+      };
+      return labels[type] || type.charAt(0).toUpperCase() + type.slice(1);
+    };
+
+    const getNodeDescription = (type: string) => {
+      const descriptions: Record<string, string> = {
+        'start': 'Flow execution starts here',
+        'conditional': 'Make decisions based on conditions',
+        'arithmetic': 'Perform mathematical operations',
+        'variable': 'Set, get, or modify variables',
+        'loop': 'Repeat operations',
+        'timer': 'Add delays or intervals',
+        'blockchain': 'Execute SEI blockchain operations',
+        'llm': 'Use AI to analyze and make decisions',
+      };
+      return descriptions[type] || `Configure your ${type} node`;
     };
 
     const newNode: Node = {
@@ -178,10 +217,10 @@ const FlowBuilder: React.FC = () => {
       type: nodeType,
       position,
       data: {
-        label: nodeType.charAt(0).toUpperCase() + nodeType.slice(1),
+        label: getNodeLabel(nodeType),
         type: nodeType,
         config: getDefaultConfig(nodeType),
-        description: `Configure your ${nodeType} node`,
+        description: getNodeDescription(nodeType),
         status: 'idle',
       },
     };
@@ -417,14 +456,47 @@ const FlowBuilder: React.FC = () => {
     return variables;
   }, []);
 
-  // Add new variable to available variables
+  // Add new variable to available variables and declared variables
   const addVariable = useCallback((variableName: string) => {
+    console.log('FlowBuilder addVariable called:', variableName);
     if (!availableVariables.includes(variableName)) {
       setAvailableVariables(prev => [...prev, variableName]);
     }
-  }, [availableVariables]);
+    
+    // Also add to declared variables if it doesn't exist
+    if (!declaredVariables.some(v => v.name === variableName)) {
+      const newVariable: VariableDeclaration = {
+        name: variableName,
+        type: 'string', // Default type for new variables
+        defaultValue: '',
+        description: `Variable ${variableName}`
+      };
+      
+      console.log('Adding new variable to declaredVariables:', newVariable);
+      setDeclaredVariables(prev => [...prev, newVariable]);
+      
+      // Update the Start node's config with the new variable
+      setNodes((currentNodes) =>
+        currentNodes.map((node) =>
+          node.type === 'start'
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: {
+                    ...node.data.config,
+                    variables: [...(node.data.config.variables || []), newVariable],
+                  },
+                },
+              }
+            : node
+        )
+      );
+    }
+  }, [availableVariables, declaredVariables, setNodes]);
 
   const handleVariablesChange = useCallback((variables: VariableDeclaration[]) => {
+    console.log('FlowBuilder handleVariablesChange called:', variables);
     setDeclaredVariables(variables);
     // Update available variables list from declared variables
     const variableNames = variables.map(v => v.name);
@@ -914,7 +986,6 @@ const FlowBuilder: React.FC = () => {
         selectedEdge={selectedEdge}
         onNodeDataChange={onNodeDataChange}
         availableVariables={availableVariables}
-        onAddVariable={addVariable}
         declaredVariables={declaredVariables}
         onVariablesChange={handleVariablesChange}
       />

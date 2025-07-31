@@ -20,7 +20,6 @@ interface NodePanelProps {
   selectedEdge: Edge | null;
   onNodeDataChange: (nodeId: string, newData: any) => void;
   availableVariables?: string[];
-  onAddVariable?: (variableName: string) => void;
   declaredVariables?: VariableDeclaration[];
   onVariablesChange?: (variables: VariableDeclaration[]) => void;
 }
@@ -30,21 +29,35 @@ const NodePanel: React.FC<NodePanelProps> = ({
   selectedEdge,
   onNodeDataChange,
   availableVariables = [],
-  onAddVariable = () => {},
   declaredVariables = [],
   onVariablesChange = () => {},
 }) => {
   const [config, setConfig] = useState<any>({});
+  
+  // Blockchain node state
+  const [blockchainNetwork, setBlockchainNetwork] = useState('mainnet');
+  const [blockchainSelectedTool, setBlockchainSelectedTool] = useState('');
+  const [blockchainToolParameters, setBlockchainToolParameters] = useState<Record<string, any>>({});
 
   // Update config when selected node changes
   useEffect(() => {
     if (selectedNode) {
-      setConfig(selectedNode.data.config || {});
+      const newConfig = selectedNode.data.config || {};
+      setConfig(newConfig);
+      
+      // Initialize blockchain state if it's a blockchain node
+      if (selectedNode.type === 'blockchain') {
+        setBlockchainNetwork(newConfig.network || 'mainnet');
+        setBlockchainSelectedTool(newConfig.selectedTool || '');
+        setBlockchainToolParameters(newConfig.toolParameters || {});
+      }
     }
   }, [selectedNode]);
 
   const handleConfigChange = (key: string, value: any) => {
+    console.log('handleConfigChange', key, value);
     const newConfig = { ...config, [key]: value };
+    console.log('newConfig', newConfig);
     setConfig(newConfig);
     
     if (selectedNode) {
@@ -93,22 +106,31 @@ const NodePanel: React.FC<NodePanelProps> = ({
           collection: '',
           maxIterations: 10,
         };
-              case 'timer':
-          return {
-            timerType: 'delay',
-            duration: 1000,
-            unit: 'ms',
-            repeatCount: -1,
-            timeoutAction: 'continue',
+      case 'timer':
+        return {
+          timerType: 'delay',
+          duration: 1000,
+          unit: 'ms',
+          repeatCount: -1,
+          timeoutAction: 'continue',
+            outputVariable: '',
+        };
+      case 'blockchain':
+        return {
+            network: 'mainnet',
+            selectedTool: '',
+            toolParameters: {},
             outputVariable: '',
           };
-              case 'blockchain':
+              case 'llm':
           return {
-            operation: 'getBalance',
-            address: '',
-            token: '',
+            prompt: '',
+            input: '',
             outputVariable: '',
-          };
+            chatInterface: false,
+            model: 'gpt-4-turbo',
+            temperature: 0,
+        };
       default:
         return {};
     }
@@ -137,7 +159,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
       </div>
       
       <ValueSelector
-        value={config.value1 || ''}
+          value={config.value1 || ''}
         onChange={(value) => handleConfigChange('value1', value)}
         variables={declaredVariables}
         placeholder="Enter value or select variable"
@@ -159,9 +181,9 @@ const NodePanel: React.FC<NodePanelProps> = ({
         <TypeSelector
           value={config.outputVariable || ''}
           onChange={(value) => handleConfigChange('outputVariable', value)}
-          variables={declaredVariables}
-          expectedType="boolean"
-          placeholder="Select boolean variable to store result"
+                      variables={declaredVariables}
+            expectedType="boolean"
+            placeholder="Select boolean variable to store result"
         />
       </div>
     </div>
@@ -189,7 +211,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
       </div>
       
       <ValueSelector
-        value={config.value1 || ''}
+          value={config.value1 || ''}
         onChange={(value) => handleConfigChange('value1', value)}
         variables={declaredVariables}
         expectedType="number"
@@ -213,9 +235,9 @@ const NodePanel: React.FC<NodePanelProps> = ({
         <TypeSelector
           value={config.outputVariable || ''}
           onChange={(value) => handleConfigChange('outputVariable', value)}
-          variables={declaredVariables}
-          expectedType="number"
-          placeholder="Select number variable to store result"
+                      variables={declaredVariables}
+            expectedType="number"
+            placeholder="Select number variable to store result"
         />
       </div>
     </div>
@@ -482,84 +504,474 @@ const NodePanel: React.FC<NodePanelProps> = ({
         <TypeSelector
           value={config.outputVariable || ''}
           onChange={(value) => handleConfigChange('outputVariable', value)}
-          variables={declaredVariables}
-          placeholder="Select variable to store timing result"
-        />
+                      variables={declaredVariables}
+            placeholder="Select variable to store timing result"
+          />
       </div>
     </div>
   );
 
-  const renderBlockchainConfig = () => (
+  // Tool network support mapping (matching backend)
+  const TOOL_NETWORK_SUPPORT = {
+    // Basic Operations (All Networks)
+    'sei_erc20_balance': ['mainnet', 'testnet', 'devnet'],
+    'sei_erc20_transfer': ['mainnet', 'testnet', 'devnet'],
+    'sei_native_transfer': ['mainnet', 'testnet', 'devnet'],
+    'sei_erc721_balance': ['mainnet', 'testnet', 'devnet'],
+    'sei_erc721_transfer': ['mainnet', 'testnet', 'devnet'],
+    'sei_erc721_mint': ['mainnet', 'testnet', 'devnet'],
+    
+    // DeFi Operations (Mainnet Only)
+    'sei_swap': ['mainnet'],
+    'sei_stake': ['mainnet'],
+    'sei_unstake': ['mainnet'],
+    'sei_mint_takara': ['mainnet'],
+    'sei_borrow_takara': ['mainnet'],
+    'sei_repay_takara': ['mainnet'],
+    'sei_redeem_takara': ['mainnet'],
+    'sei_get_redeemable_amount': ['mainnet'],
+    'sei_get_borrow_balance': ['mainnet'],
+    
+    // Trading Operations (Mainnet Only)
+    'sei_citrex_deposit': ['mainnet'],
+    'sei_citrex_withdraw': ['mainnet'],
+    'sei_citrex_get_products': ['mainnet'],
+    'sei_citrex_get_order_book': ['mainnet'],
+    'sei_citrex_get_account_health': ['mainnet'],
+    'sei_citrex_get_tickers': ['mainnet'],
+    'sei_citrex_calculate_margin_requirement': ['mainnet'],
+    'sei_citrex_get_klines': ['mainnet'],
+    'sei_citrex_get_product': ['mainnet'],
+    'sei_citrex_get_server_time': ['mainnet'],
+    'sei_citrex_get_trade_history': ['mainnet'],
+    'sei_citrex_cancel_and_replace_order': ['mainnet'],
+    'sei_citrex_cancel_open_orders_for_product': ['mainnet'],
+    'sei_citrex_cancel_order': ['mainnet'],
+    'sei_citrex_cancel_orders': ['mainnet'],
+    'sei_citrex_list_balances': ['mainnet'],
+    'sei_citrex_list_open_orders': ['mainnet'],
+    'sei_citrex_list_positions': ['mainnet'],
+    'sei_citrex_place_order': ['mainnet'],
+    'sei_citrex_place_orders': ['mainnet'],
+    
+    // Social Operations (Mainnet Only)
+    'sei_post_tweet': ['mainnet'],
+    'sei_get_account_details': ['mainnet'],
+    'sei_get_account_mentions': ['mainnet'],
+    'sei_post_tweet_reply': ['mainnet'],
+    
+    // Carbon Strategies (Mainnet Only)
+    'sei_compose_trade_by_source_tx': ['mainnet'],
+    'sei_compose_trade_by_target_tx': ['mainnet'],
+    'sei_create_buy_sell_strategy': ['mainnet'],
+    'sei_create_overlapping_strategy': ['mainnet'],
+    'sei_delete_strategy': ['mainnet'],
+    'sei_get_user_strategies': ['mainnet'],
+    'sei_update_strategy': ['mainnet']
+  };
+
+  // Available tools with labels and categories
+  const AVAILABLE_TOOLS = [
+    // Basic Operations
+    { value: 'sei_erc20_balance', label: 'Get Token Balance', category: 'Basic' },
+    { value: 'sei_erc20_transfer', label: 'Transfer Tokens', category: 'Basic' },
+    { value: 'sei_native_transfer', label: 'Transfer Native SEI', category: 'Basic' },
+    { value: 'sei_erc721_balance', label: 'Get NFT Balance', category: 'Basic' },
+    { value: 'sei_erc721_transfer', label: 'Transfer NFT', category: 'Basic' },
+    { value: 'sei_erc721_mint', label: 'Mint NFT', category: 'Basic' },
+    
+    // DeFi Operations
+    { value: 'sei_swap', label: 'Swap Tokens', category: 'DeFi' },
+    { value: 'sei_stake', label: 'Stake SEI', category: 'DeFi' },
+    { value: 'sei_unstake', label: 'Unstake SEI', category: 'DeFi' },
+    { value: 'sei_mint_takara', label: 'Mint tTokens', category: 'DeFi' },
+    { value: 'sei_borrow_takara', label: 'Borrow from Takara', category: 'DeFi' },
+    { value: 'sei_repay_takara', label: 'Repay to Takara', category: 'DeFi' },
+    { value: 'sei_redeem_takara', label: 'Redeem from Takara', category: 'DeFi' },
+    
+    // Trading Operations
+    { value: 'sei_citrex_place_order', label: 'Place Trading Order', category: 'Trading' },
+    { value: 'sei_citrex_get_products', label: 'Get Trading Products', category: 'Trading' },
+    { value: 'sei_citrex_get_order_book', label: 'Get Order Book', category: 'Trading' },
+    { value: 'sei_citrex_list_balances', label: 'Get Trading Balance', category: 'Trading' },
+    
+    // Social Operations
+    { value: 'sei_post_tweet', label: 'Post Tweet', category: 'Social' },
+    { value: 'sei_get_account_details', label: 'Get Account Details', category: 'Social' }
+  ];
+
+  const renderBlockchainConfig = () => {
+    // Get available tools based on selected network
+    const getAvailableTools = (selectedNetwork: string) => {
+      return AVAILABLE_TOOLS.filter(tool => 
+        TOOL_NETWORK_SUPPORT[tool.value as keyof typeof TOOL_NETWORK_SUPPORT]?.includes(selectedNetwork)
+      );
+    };
+    
+    const availableTools = getAvailableTools(blockchainNetwork);
+    
+    // Tool parameter schemas
+    const toolSchemas = {
+      sei_erc20_balance: [
+        { name: 'ticker', type: 'string', label: 'Token Ticker', required: false, placeholder: 'SEI, USDC, USDT' },
+        { name: 'contract_address', type: 'string', label: 'Contract Address', required: false, placeholder: '0x...' }
+      ],
+      sei_erc20_transfer: [
+        { name: 'amount', type: 'string', label: 'Amount', required: true, placeholder: '1.5' },
+        { name: 'recipient', type: 'string', label: 'Recipient Address', required: true, placeholder: '0x...' },
+        { name: 'ticker', type: 'string', label: 'Token Ticker', required: false, placeholder: 'SEI, USDC, USDT' }
+      ],
+      sei_native_transfer: [
+        { name: 'amount', type: 'string', label: 'Amount', required: true, placeholder: '1.5' },
+        { name: 'recipient', type: 'string', label: 'Recipient Address', required: true, placeholder: '0x...' }
+      ],
+      sei_swap: [
+        { name: 'amount', type: 'string', label: 'Amount', required: true, placeholder: '1.5' },
+        { name: 'tokenIn', type: 'string', label: 'Token In Address', required: true, placeholder: '0x...' },
+        { name: 'tokenOut', type: 'string', label: 'Token Out Address', required: true, placeholder: '0x...' }
+      ],
+      sei_stake: [
+        { name: 'amount', type: 'string', label: 'Amount to Stake', required: true, placeholder: '10' }
+      ],
+      sei_borrow_takara: [
+        { name: 'ticker', type: 'string', label: 'Token Ticker', required: true, placeholder: 'SEI, USDC' },
+        { name: 'borrowAmount', type: 'string', label: 'Borrow Amount', required: true, placeholder: '100' }
+      ],
+      sei_citrex_place_order: [
+        { name: 'orderArgs', type: 'object', label: 'Order Arguments', required: true, placeholder: 'JSON object' }
+      ],
+      sei_post_tweet: [
+        { name: 'tweet', type: 'string', label: 'Tweet Content', required: true, placeholder: 'Your tweet here...' }
+      ]
+    };
+    
+    const currentSchema = toolSchemas[blockchainSelectedTool as keyof typeof toolSchemas] || [];
+    
+    return (
+      <div className="space-y-4">
+        {/* Network Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Network Environment
+          </label>
+          <select
+            value={blockchainNetwork}
+            onChange={(e) => {
+              const newNetwork = e.target.value;
+              
+              setBlockchainNetwork(newNetwork);
+              
+              // Reset tool selection if current tool is not supported on new network
+              if (blockchainSelectedTool && !getAvailableTools(newNetwork).find(t => t.value === blockchainSelectedTool)) {
+                setBlockchainSelectedTool('');
+                setBlockchainToolParameters({});
+              }
+              
+              // Update node config
+              const newConfig = {
+                ...config,
+                network: newNetwork,
+                selectedTool: blockchainSelectedTool && !getAvailableTools(newNetwork).find(t => t.value === blockchainSelectedTool) ? '' : blockchainSelectedTool,
+                toolParameters: blockchainSelectedTool && !getAvailableTools(newNetwork).find(t => t.value === blockchainSelectedTool) ? {} : blockchainToolParameters
+              };
+              
+              if (selectedNode) {
+                onNodeDataChange(selectedNode.id, { config: newConfig });
+              }
+            }}
+            className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white backdrop-blur-sm transition-all duration-200 cursor-pointer"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="mainnet">Mainnet (All Operations)</option>
+            <option value="testnet">Testnet (Basic Operations Only)</option>
+            <option value="devnet">Devnet (Basic Operations Only)</option>
+          </select>
+        </div>
+        
+        {/* Network Warning */}
+        {blockchainNetwork !== 'mainnet' && (
+          <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
+            <div className="flex items-center space-x-2">
+              <span className="text-yellow-400">⚠️</span>
+              <span className="text-yellow-300 text-sm font-medium">
+                {blockchainNetwork.toUpperCase()} Environment
+              </span>
+            </div>
+            <p className="text-yellow-200 text-xs mt-1">
+              Only basic operations (ERC-20, Native SEI) are available on {blockchainNetwork}. 
+              DeFi protocols require mainnet.
+            </p>
+          </div>
+        )}
+        
+        {/* Tool Selection */}
+        <div>
+          <label className="text-sm font-medium text-gray-300 mb-1">
+            Blockchain Operation
+          </label>
+          <select
+            value={blockchainSelectedTool}
+            onChange={(e) => {
+              const selectedValue = e.target.value;
+              
+              // Update local state
+              setBlockchainSelectedTool(selectedValue);
+              setBlockchainToolParameters({});
+              
+              // Update node config
+              const newConfig = {
+                ...config,
+                selectedTool: selectedValue,
+                toolParameters: {}
+              };
+              
+              if (selectedNode) {
+                onNodeDataChange(selectedNode.id, { config: newConfig });
+              }
+            }}
+            className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white backdrop-blur-sm transition-all duration-200 cursor-pointer"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="">Select a blockchain operation</option>
+            {availableTools.map(tool => (
+              <option key={tool.value} value={tool.value} className="bg-gray-700 text-white">
+                {tool.label} ({tool.category})
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Dynamic Parameters */}
+        {blockchainSelectedTool && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-gray-300">Parameters</h4>
+            {currentSchema.map(param => (
+              <div key={param.name}>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  {param.label} {param.required && <span className="text-red-400">*</span>}
+                </label>
+                {param.type === 'string' && (
+                  <ValueSelector
+                    value={blockchainToolParameters[param.name] || ''}
+                    onChange={(value) => {
+                      const newParams = { ...blockchainToolParameters, [param.name]: value };
+                      setBlockchainToolParameters(newParams);
+                      
+                      // Update node config
+                      const newConfig = {
+                        ...config,
+                        toolParameters: newParams
+                      };
+                      
+                      if (selectedNode) {
+                        onNodeDataChange(selectedNode.id, { config: newConfig });
+                      }
+                    }}
+                    variables={declaredVariables}
+                    expectedType="string"
+                    placeholder={param.placeholder}
+                  />
+                )}
+                {param.type === 'object' && (
+                  <textarea
+                    value={JSON.stringify(blockchainToolParameters[param.name] || {}, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        const value = JSON.parse(e.target.value);
+                        const newParams = { ...blockchainToolParameters, [param.name]: value };
+                        setBlockchainToolParameters(newParams);
+                        
+                        // Update node config
+                        const newConfig = {
+                          ...config,
+                          toolParameters: newParams
+                        };
+                        
+                        if (selectedNode) {
+                          onNodeDataChange(selectedNode.id, { config: newConfig });
+                        }
+                      } catch (error) {
+                        // Handle invalid JSON
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200"
+                    placeholder={param.placeholder}
+                    rows={4}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Output Variable */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Output Variable (optional)
+          </label>
+          <TypeSelector
+            value={config.outputVariable || ''}
+            onChange={(value) => {
+              const newConfig = {
+                ...config,
+                outputVariable: value
+              };
+              
+              // Update local state immediately
+              setConfig(newConfig);
+              
+              if (selectedNode) {
+                onNodeDataChange(selectedNode.id, { config: newConfig });
+              }
+            }}
+            variables={declaredVariables}
+            placeholder="Variable to store result"
+          />
+        </div>
+        
+        {/* Tool Description */}
+        {blockchainSelectedTool && (
+          <div className="bg-gray-800/50 rounded-lg p-3">
+            <h4 className="text-sm font-medium text-gray-300 mb-2">Operation Description</h4>
+            <p className="text-xs text-gray-400">
+              {getToolDescription(blockchainSelectedTool)}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const getToolDescription = (toolName: string) => {
+    const descriptions: Record<string, string> = {
+      'sei_erc20_balance': 'Get the balance of ERC-20 tokens for the connected wallet',
+      'sei_erc20_transfer': 'Transfer ERC-20 tokens to another address',
+      'sei_native_transfer': 'Transfer native SEI tokens to another address',
+      'sei_swap': 'Swap tokens using the Symphony aggregator',
+      'sei_stake': 'Stake SEI tokens to earn rewards',
+      'sei_borrow_takara': 'Borrow tokens from the Takara lending protocol',
+      'sei_citrex_place_order': 'Place a trading order on Citrex perpetual exchange',
+      'sei_post_tweet': 'Post a tweet to Twitter'
+    };
+    return descriptions[toolName] || 'Execute blockchain operation';
+  };
+
+  const renderLLMConfig = () => (
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">
-          Operation
+          System Prompt
+        </label>
+        <textarea
+          value={config.prompt || ''}
+          onChange={(e) => handleConfigChange('prompt', e.target.value)}
+          className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200"
+          placeholder="Define the LLM's role and capabilities..."
+          rows={4}
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1">
+          Input
+        </label>
+        <ValueSelector
+          value={config.input || ''}
+          onChange={(value) => handleConfigChange('input', value)}
+          variables={declaredVariables}
+          expectedType="string"
+          placeholder="Enter input or select variable"
+        />
+      </div>
+      
+              <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Output Variable
+          </label>
+          <TypeSelector
+            value={config.outputVariable || ''}
+            onChange={(value) => {
+              const newConfig = {
+                ...config,
+                outputVariable: value
+              };
+              
+              // Update local state immediately
+              setConfig(newConfig);
+              
+              if (selectedNode) {
+                onNodeDataChange(selectedNode.id, { config: newConfig });
+              }
+            }}
+            variables={declaredVariables}
+            placeholder="Variable to store LLM output"
+          />
+        </div>
+      
+      <div className="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          checked={config.chatInterface || false}
+          onChange={(e) => handleConfigChange('chatInterface', e.target.checked)}
+          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+        />
+        <label className="text-sm text-gray-300">
+          Enable Chat Interface
+        </label>
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1">
+          Model
         </label>
         <select
-          value={config.operation || 'getBalance'}
-          onChange={(e) => handleConfigChange('operation', e.target.value)}
+          value={config.model || 'gpt-4-turbo'}
+          onChange={(e) => handleConfigChange('model', e.target.value)}
           className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white backdrop-blur-sm transition-all duration-200"
-          style={{
-            colorScheme: 'dark'
-          }}
         >
-          <option value="getBalance" className="bg-gray-700 text-white">Get Balance</option>
-          <option value="transfer" className="bg-gray-700 text-white">Transfer</option>
-          <option value="swap" className="bg-gray-700 text-white">Swap Tokens</option>
-          <option value="stake" className="bg-gray-700 text-white">Stake</option>
-          <option value="borrow" className="bg-gray-700 text-white">Borrow</option>
+          <option value="gpt-4-turbo">GPT-4 Turbo</option>
+          <option value="gpt-4">GPT-4</option>
+          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
         </select>
       </div>
       
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">
-          Address
+          Temperature
         </label>
-        <ValueSelector
-          value={config.address || ''}
-          onChange={(value) => handleConfigChange('address', value)}
-          variables={declaredVariables}
-          expectedType="string"
-          placeholder="Enter wallet address"
+        <input
+          type="range"
+          min="0"
+          max="2"
+          step="0.1"
+          value={config.temperature || 0}
+          onChange={(e) => handleConfigChange('temperature', parseFloat(e.target.value))}
+          className="w-full"
         />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
-          Token
-        </label>
-        <ValueSelector
-          value={config.token || ''}
-          onChange={(value) => handleConfigChange('token', value)}
-          variables={declaredVariables}
-          expectedType="string"
-          placeholder="Enter token symbol"
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
-          Output Variable (optional)
-        </label>
-        <TypeSelector
-          value={config.outputVariable || ''}
-          onChange={(value) => handleConfigChange('outputVariable', value)}
-          variables={declaredVariables}
-          placeholder="Select variable to store result"
-        />
+        <span className="text-xs text-gray-400">{config.temperature || 0}</span>
       </div>
     </div>
   );
 
   const renderStartConfig = () => {
-    // Use variables from the selected node's config if available, otherwise use declaredVariables
-    const nodeVariables = selectedNode?.data?.config?.variables || declaredVariables;
-    
     return (
       <div className="space-y-4">
         <VariableDeclarationPanel
-          variables={nodeVariables}
-          onVariablesChange={onVariablesChange}
+          variables={declaredVariables}
+          onVariablesChange={(newVariables) => {
+            console.log('Start node variables changed:', newVariables);
+            // Update the node's config with the new variables
+            if (selectedNode) {
+              const newConfig = {
+                ...config,
+                variables: newVariables
+              };
+              setConfig(newConfig);
+              onNodeDataChange(selectedNode.id, { config: newConfig });
+            }
+            // Also call the parent's onVariablesChange
+            onVariablesChange(newVariables);
+          }}
         />
       </div>
     );
@@ -583,6 +995,8 @@ const NodePanel: React.FC<NodePanelProps> = ({
         return renderTimerConfig();
       case 'blockchain':
         return renderBlockchainConfig();
+      case 'llm':
+        return renderLLMConfig();
       default:
         return (
           <div className="text-gray-400 text-sm">

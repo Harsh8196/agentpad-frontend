@@ -21,7 +21,9 @@ import {
   Wallet,
   ArrowLeftRight,
   PiggyBank,
-  Building2
+  Building2,
+  Bot,
+  Play
 } from 'lucide-react';
 
 interface BlockLibraryProps {
@@ -54,10 +56,25 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
   onToggleCollapse 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('basic-logic');
+  const [selectedCategory, setSelectedCategory] = useState('core');
   const [draggedBlock, setDraggedBlock] = useState<Block | null>(null);
 
   const categories: BlockCategory[] = [
+    {
+      id: 'core',
+      name: 'Core',
+      icon: Play,
+      blocks: [
+        {
+          id: 'start',
+          name: 'Start',
+          description: 'Flow execution starts here',
+          icon: Play,
+          type: 'start',
+          color: 'bg-green-600',
+        },
+      ],
+    },
     {
       id: 'basic-logic',
       name: 'Basic Logic',
@@ -112,11 +129,26 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
       blocks: [
         {
           id: 'blockchain',
-          name: 'Blockchain',
-          description: 'SEI blockchain operations (balance, transfer, swap)',
+          name: 'Blockchain Operation',
+          description: 'Execute any SEI blockchain operation',
           icon: Wallet,
           type: 'blockchain',
           color: 'bg-yellow-500',
+        },
+      ],
+    },
+    {
+      id: 'ai',
+      name: 'AI',
+      icon: Bot,
+      blocks: [
+        {
+          id: 'llm',
+          name: 'AI Assistant',
+          description: 'Use AI to analyze and make decisions',
+          icon: Bot,
+          type: 'llm',
+          color: 'bg-pink-500',
         },
       ],
     },
@@ -148,11 +180,11 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`bg-gray-800/50 border-r border-gray-700 flex flex-col transition-all duration-300 backdrop-blur-sm ${
+    <div className={`bg-gray-800/50 border-r border-gray-700 flex flex-col transition-all duration-300 backdrop-blur-sm h-full ${
       isCollapsed ? 'w-12' : 'w-80'
     }`}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+      <div className="p-4 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
         {!isCollapsed && (
           <>
             <h2 className="text-lg font-semibold text-white">Block Library</h2>
@@ -177,7 +209,7 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
       {!isCollapsed && (
         <>
           {/* Search */}
-          <div className="p-4 border-b border-gray-700">
+          <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
               <input
@@ -190,9 +222,9 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
             </div>
           </div>
 
-          {/* Categories */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4">
+          {/* Categories - Scrollable Area */}
+          <div className="flex-1 overflow-y-auto min-h-0 block-library-scrollbar relative">
+            <div className="p-4 pb-8">
               {filteredCategories.map((category) => (
                 <div key={category.id} className="mb-6">
                   <div className="flex items-center mb-3">
@@ -226,6 +258,9 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
                 </div>
               ))}
             </div>
+            
+            {/* Scroll indicator gradient */}
+            <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-gray-800/50 to-transparent pointer-events-none"></div>
           </div>
         </>
       )}
