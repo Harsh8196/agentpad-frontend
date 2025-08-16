@@ -9,7 +9,8 @@ import {
   Settings, 
   Eye,
   EyeOff,
-  X
+  X,
+  Maximize2
 } from 'lucide-react';
 
 interface FlowToolbarProps {
@@ -24,6 +25,7 @@ interface FlowToolbarProps {
   isNewFlow?: boolean;
   isSaving?: boolean;
   validationErrors?: string[];
+  onFitView?: () => void;
 }
 
 const FlowToolbar: React.FC<FlowToolbarProps> = ({
@@ -38,6 +40,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
   isNewFlow = true,
   isSaving = false,
   validationErrors = [],
+  onFitView,
 }) => {
   console.log('FlowToolbar props:', { currentFlowName, isNewFlow, isSaving });
   
@@ -71,12 +74,15 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
 
         {/* Center - View controls */}
         <div className="flex items-center space-x-2">
-          <button
-            className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 rounded-lg transition-colors"
-            title="Toggle minimap"
-          >
-            <Eye className="h-4 w-4" />
-          </button>
+          {onFitView && (
+            <button
+              onClick={onFitView}
+              className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 rounded-lg transition-colors"
+              title="Fit view to canvas"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          )}
           
           <button
             className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 rounded-lg transition-colors"

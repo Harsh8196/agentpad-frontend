@@ -18,11 +18,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  // Check if current path is an auth page
+  // Check if current path is public (landing or auth)
   const isAuthPage = pathname?.startsWith('/auth');
+  const isHomePage = pathname === '/';
 
-  // For auth pages, render without ProtectedRoute and without header/sidebar
-  if (isAuthPage) {
+  // For public pages, render without ProtectedRoute or app chrome
+  if (isAuthPage || isHomePage) {
     return <>{children}</>;
   }
 
@@ -39,7 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <Header onToggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
 
           {/* Page content */}
-          <main className="flex-1 overflow-y-auto">
+          <main className={`flex-1 overflow-y-auto transition-all duration-300 ${!isSidebarOpen ? 'ml-0' : ''}`}>
             {children}
           </main>
         </div>

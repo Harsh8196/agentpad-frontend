@@ -13,6 +13,7 @@ import ReactFlow, {
   MiniMap,
   ReactFlowProvider,
   NodeTypes,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -28,6 +29,12 @@ import TimerNode from './nodes/TimerNode';
 import BlockchainNode from './nodes/BlockchainNode';
 import StartNode from './nodes/StartNode';
 import LLMNode from './nodes/LLMNode';
+import MarketDataNode from './nodes/MarketDataNode';
+import TelegramNode from './nodes/TelegramNode';
+import UserApprovalNode from './nodes/UserApprovalNode';
+import LoggerNode from './nodes/LoggerNode';
+import SmartContractReadNode from './nodes/SmartContractReadNode';
+import SmartContractWriteNode from './nodes/SmartContractWriteNode';
 import { z } from 'zod';
 import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
@@ -50,6 +57,12 @@ const nodeTypes: NodeTypes = {
   blockchain: BlockchainNode,
   start: StartNode,
   llm: LLMNode,
+  marketData: MarketDataNode,
+  telegram: TelegramNode,
+  userApproval: UserApprovalNode,
+  logger: LoggerNode,
+  smartContractRead: SmartContractReadNode,
+  smartContractWrite: SmartContractWriteNode,
 };
 
 // Define the flow schema
@@ -77,9 +90,12 @@ const flowSchema = z.object({
   timestamp: z.string(),
 });
 
+
+
 const FlowBuilder: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
@@ -95,6 +111,13 @@ const FlowBuilder: React.FC = () => {
   const [declaredVariables, setDeclaredVariables] = useState<VariableDeclaration[]>([]);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+
+  // Fit view function
+  const onFitView = useCallback(() => {
+    if (reactFlowInstance) {
+      reactFlowInstance.fitView({ padding: 0.1, includeHiddenNodes: false });
+    }
+  }, [reactFlowInstance]);
 
   // Handle edge connections
   const onConnect = useCallback(
@@ -159,6 +182,12 @@ const FlowBuilder: React.FC = () => {
             timeoutAction: 'continue',
             outputVariable: '',
           };
+        case 'logger':
+          return {
+            level: 'info',
+            message: '',
+            value: '',
+          };
         case 'blockchain':
           return {
             network: 'mainnet',
@@ -172,12 +201,60 @@ const FlowBuilder: React.FC = () => {
           };
         case 'llm':
           return {
-            prompt: '',
+            outputMode: 'assistant',
+            analysisType: 'general',
+            network: 'mainnet',
+            availableActions: 'buy_sei,sell_sei,stake_sei,hold,rebalance', // default; user can clear to empty string
+            systemPrompt: '',
             input: '',
             outputVariable: '',
             chatInterface: false,
-            model: 'gpt-4-turbo',
+            model: 'gpt-4o-mini',
             temperature: 0,
+          };
+        case 'telegram':
+          return {
+            botToken: '',
+            chatId: '',
+            message: '',
+            interactive: false,
+            buttons: [],
+            outputVariable: '',
+          };
+        case 'userApproval':
+          return {
+            approvalType: 'telegram',
+            timeout: 3600,
+            message: 'Please approve this action',
+            approvalActions: ['approve', 'reject'],
+            outputVariable: '',
+          };
+        case 'marketData':
+          return {
+            symbol: 'sei',
+            outputVariable: '',
+          };
+        case 'smartContractRead':
+          return {
+            network: 'sei',
+            contractAddress: '',
+            abi: '',
+            methodName: '',
+            parameters: {},
+            outputVariable: '',
+          };
+        case 'smartContractWrite':
+          return {
+            network: 'sei',
+            contractAddress: '',
+            abi: '',
+            methodName: '',
+            parameters: {},
+            gasLimit: '',
+            gasPrice: '',
+            value: '',
+            waitForConfirmation: true,
+            outputVariable: '',
           };
         default:
           return {};
@@ -194,6 +271,11 @@ const FlowBuilder: React.FC = () => {
         'timer': 'Timer',
         'blockchain': 'Blockchain Operation',
         'llm': 'AI Assistant',
+        'telegram': 'Telegram',
+        'userApproval': 'User Approval',
+        'marketData': 'Market Data',
+        'smartContractRead': 'Smart Contract Read',
+        'smartContractWrite': 'Smart Contract Write',
       };
       return labels[type] || type.charAt(0).toUpperCase() + type.slice(1);
     };
@@ -208,6 +290,11 @@ const FlowBuilder: React.FC = () => {
         'timer': 'Add delays or intervals',
         'blockchain': 'Execute SEI blockchain operations',
         'llm': 'Use AI to analyze and make decisions',
+        'telegram': 'Send notifications and interactive messages',
+        'userApproval': 'Wait for user confirmation before proceeding',
+        'marketData': 'Fetch real-time token price and market data',
+        'smartContractRead': 'Read data from any smart contract',
+        'smartContractWrite': 'Execute transactions on smart contracts',
       };
       return descriptions[type] || `Configure your ${type} node`;
     };
@@ -860,7 +947,7 @@ const FlowBuilder: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-gray-900">
       {/* Top Section */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         {/* Block Library */}
         <BlockLibrary
           isOpen={isLibraryOpen}
@@ -882,6 +969,7 @@ const FlowBuilder: React.FC = () => {
             isNewFlow={isNewFlow}
             isSaving={isSaving}
             validationErrors={validateNodeConfigurations()}
+            onFitView={onFitView}
           />
           {/* Admin-only: Add to Template Library */}
           {user?.user_metadata?.role === 'admin' && (
@@ -965,8 +1053,11 @@ const FlowBuilder: React.FC = () => {
                 onKeyDown={onKeyDown}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
+                onInit={setReactFlowInstance}
                 nodeTypes={nodeTypes}
-                fitView
+                minZoom={0.1}
+                maxZoom={2}
+                defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
                 attributionPosition="bottom-left"
                 className="dark"
                 style={{ zIndex: 1 }}

@@ -86,6 +86,33 @@ svg {
   background: var(--muted);
 }
 
+/* Block Library specific scrollbar */
+.block-library-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.block-library-scrollbar::-webkit-scrollbar-track {
+  background: rgba(55, 65, 81, 0.3);
+  border-radius: 4px;
+}
+
+.block-library-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 4px;
+  border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+.block-library-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Ensure the BlockLibrary column can actually shrink and scroll */
+.block-library-scrollbar {
+  /* For Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156,163,175,0.5) rgba(55,65,81,0.3);
+}
+
 /* Ensure header and dropdowns appear above ReactFlow */
 header {
   z-index: 9999 !important;

@@ -59,6 +59,18 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
+  // Public landing page: allow unauthenticated access to '/'
+  if (!session && req.nextUrl.pathname === '/') {
+    return response;
+  }
+
+  // If user is signed in and hits the landing page, send to dashboard
+  if (session && req.nextUrl.pathname === '/') {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = '/dashboard';
+    return NextResponse.redirect(redirectUrl);
+  }
+
   // If user is not signed in and the current path is not auth-related, redirect to login
   if (!session && !req.nextUrl.pathname.startsWith('/auth')) {
     const redirectUrl = req.nextUrl.clone();

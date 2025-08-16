@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Zap, 
   Users, 
@@ -23,7 +23,11 @@ import {
   PiggyBank,
   Building2,
   Bot,
-  Play
+  Play,
+  Send,
+  CheckCircle,
+  FileText,
+  Edit3
 } from 'lucide-react';
 
 interface BlockLibraryProps {
@@ -58,6 +62,22 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('core');
   const [draggedBlock, setDraggedBlock] = useState<Block | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const categories: BlockCategory[] = [
     {
@@ -120,6 +140,30 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
           type: 'timer',
           color: 'bg-indigo-500',
         },
+        {
+          id: 'logger',
+          name: 'Logger',
+          description: 'Log variables or messages at runtime',
+          icon: MessageSquare,
+          type: 'logger',
+          color: 'bg-gray-500',
+        },
+        {
+          id: 'telegram',
+          name: 'Telegram',
+          description: 'Send notifications and interactive messages',
+          icon: Send,
+          type: 'telegram',
+          color: 'bg-blue-600',
+        },
+        {
+          id: 'userApproval',
+          name: 'User Approval',
+          description: 'Wait for user confirmation before proceeding',
+          icon: CheckCircle,
+          type: 'userApproval',
+          color: 'bg-green-600',
+        },
       ],
     },
     {
@@ -139,9 +183,17 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
     },
     {
       id: 'ai',
-      name: 'AI',
+      name: 'AI & Data',
       icon: Bot,
       blocks: [
+        {
+          id: 'marketData',
+          name: 'Market Data',
+          description: 'Fetch real-time token price and market data',
+          icon: TrendingUp,
+          type: 'marketData',
+          color: 'bg-emerald-500',
+        },
         {
           id: 'llm',
           name: 'AI Assistant',
@@ -149,6 +201,22 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
           icon: Bot,
           type: 'llm',
           color: 'bg-pink-500',
+        },
+        {
+          id: 'smartContractRead',
+          name: 'Smart Contract Read',
+          description: 'Read data from any smart contract',
+          icon: FileText,
+          type: 'smartContractRead',
+          color: 'bg-blue-500',
+        },
+        {
+          id: 'smartContractWrite',
+          name: 'Smart Contract Write',
+          description: 'Execute transactions on smart contracts',
+          icon: Edit3,
+          type: 'smartContractWrite',
+          color: 'bg-orange-500',
         },
       ],
     },
@@ -180,8 +248,8 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`bg-gray-800/50 border-r border-gray-700 flex flex-col transition-all duration-300 backdrop-blur-sm h-full ${
-      isCollapsed ? 'w-12' : 'w-80'
+    <div className={`bg-gray-800/50 border-r border-gray-700 flex flex-col transition-all duration-300 backdrop-blur-sm h-full min-h-0 ${
+      isCollapsed ? 'w-16' : 'w-80'
     }`}>
       {/* Header */}
       <div className="p-4 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
@@ -197,14 +265,82 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
           </>
         )}
         {isCollapsed && (
-          <button
-            onClick={onToggleCollapse}
-            className="p-1 hover:bg-gray-700/50 rounded mx-auto text-gray-400 hover:text-gray-300 transition-colors"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          <div className="flex flex-col items-center space-y-2">
+            <button
+              onClick={onToggleCollapse}
+              className="p-1 hover:bg-gray-700/50 rounded text-gray-400 hover:text-gray-300 transition-colors"
+              title="Expand Block Library"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <div className="w-6 h-px bg-gray-600"></div>
+          </div>
         )}
       </div>
+
+                           {/* Collapsed Category Icons with Expandable Sections */}
+        {isCollapsed && (
+                                         <div className="flex-1 flex flex-col py-4 space-y-1 overflow-y-auto block-library-scrollbar min-h-0" ref={dropdownRef}>
+            {categories.map((category) => (
+              <div key={category.id} className="relative">
+                {/* Category Header */}
+                                                   <button
+                    onClick={() => setOpenDropdown(openDropdown === category.id ? null : category.id)}
+                    className="w-full p-2 hover:bg-gray-700/50 transition-colors group relative flex items-center justify-center"
+                    title={`${category.name} (${category.blocks.length} blocks)`}
+                  >
+                    <div className="w-6 h-6 flex items-center justify-center">
+                      <category.icon className="h-5 w-5 text-gray-400 group-hover:text-gray-300 flex-shrink-0" />
+                    </div>
+                  </button>
+                
+                {/* Expandable Category Section */}
+                {openDropdown === category.id && (
+                  <div className="bg-gray-700/30 border-t border-gray-600/50">
+                    {/* Category Label */}
+                                         <div className="px-2 py-1 border-b border-gray-600/50">
+                       <div className="flex items-center justify-center">
+                         <div className="w-4 h-4 flex items-center justify-center mr-1">
+                           <category.icon className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                         </div>
+                         <span className="text-xs text-gray-400 font-medium">{category.name}</span>
+                       </div>
+                     </div>
+                    
+                    {/* Category Blocks */}
+                    <div className="py-1">
+                      {category.blocks.map((block) => (
+                                                 <div
+                           key={block.id}
+                           draggable
+                           onDragStart={(e) => handleDragStart(e, block)}
+                           onDragEnd={handleDragEnd}
+                           onClick={() => {
+                             handleBlockClick(block);
+                             setOpenDropdown(null);
+                           }}
+                           className="mx-1 mb-1 p-2 border border-gray-600/50 rounded cursor-pointer hover:border-blue-500 hover:bg-blue-500/10 transition-colors"
+                           title={`${block.name}: ${block.description}`}
+                         >
+                           <div className="flex items-center justify-center w-8 h-8">
+                             <div className={`p-1.5 rounded ${block.color} w-5 h-5 flex items-center justify-center`}>
+                               <block.icon className="h-3 w-3 text-white flex-shrink-0" />
+                             </div>
+                           </div>
+                         </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {/* Bottom padding for scrollbar visibility */}
+            <div className="h-4"></div>
+            
+            {/* Scroll indicator gradient */}
+            <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-gray-800/50 to-transparent pointer-events-none"></div>
+          </div>
+       )}
 
       {!isCollapsed && (
         <>
@@ -222,8 +358,8 @@ const BlockLibrary: React.FC<BlockLibraryProps> = ({
             </div>
           </div>
 
-          {/* Categories - Scrollable Area */}
-          <div className="flex-1 overflow-y-auto min-h-0 block-library-scrollbar relative">
+      {/* Categories - Scrollable Area */}
+      <div className="flex-1 overflow-y-auto min-h-0 block-library-scrollbar relative custom-scroll">
             <div className="p-4 pb-8">
               {filteredCategories.map((category) => (
                 <div key={category.id} className="mb-6">

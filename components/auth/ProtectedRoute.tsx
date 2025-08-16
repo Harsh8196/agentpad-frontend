@@ -11,12 +11,15 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuthContext();
   const router = useRouter();
+  const isBrowser = typeof window !== 'undefined';
+  const isPublicLanding = isBrowser && window.location.pathname === '/';
 
   useEffect(() => {
-    if (!loading && !user) {
+    // Do not force login on the public landing page ('/')
+    if (!loading && !user && !isPublicLanding) {
       router.push('/auth/login');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, isPublicLanding]);
 
   if (loading) {
     return (
@@ -29,7 +32,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!user) {
+  if (!user && !isPublicLanding) {
     return null;
   }
 
