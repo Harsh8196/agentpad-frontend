@@ -50,7 +50,7 @@ export default function RegisterPage() {
     }
     
     try {
-      const { data, error } = await signUp(formData.email, formData.password, {
+      const { error } = await signUp(formData.email, formData.password, {
         first_name: formData.firstName,
         last_name: formData.lastName,
       });
@@ -61,7 +61,7 @@ export default function RegisterPage() {
         // Registration successful, redirect to dashboard
         router.push('/dashboard');
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);

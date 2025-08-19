@@ -22,7 +22,7 @@ export default function LoginPage() {
     setError('');
     
     try {
-      const { data, error } = await signIn(email, password);
+      const { error } = await signIn(email, password);
       
       if (error) {
         console.error('Login error:', error);
@@ -199,7 +199,7 @@ export default function LoginPage() {
           {/* Sign up link */}
           <div className="text-center">
             <p className="text-sm text-gray-400">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/auth/register" className="font-medium text-blue-400 hover:text-blue-300 transition-colors">
                 Sign up
               </Link>

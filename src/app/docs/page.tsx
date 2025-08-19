@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, ChevronUp, Book, Code, Zap, Database, MessageSquare, Timer, Brain, Shield, Settings, GitBranch, Activity, Smartphone, CheckCircle, AlertCircle, BarChart3, Globe, Wallet, ChevronLeft, Sparkles, Map } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, Book, Code, Zap, Database, MessageSquare, Timer, Brain, Shield, Settings, GitBranch, Activity, CheckCircle, AlertCircle, BarChart3, Globe, Wallet, ChevronLeft, Sparkles, Map } from 'lucide-react';
 
 const DocsPage = () => {
   const [activeSection, setActiveSection] = useState('overview');
@@ -770,7 +770,7 @@ const DocsPage = () => {
       <div>
         <h1 className="text-3xl font-bold text-white mb-4">AI Planner Examples</h1>
         <p className="text-gray-300 mb-6">
-          These detailed prompts demonstrate the full capabilities of AgentPad's AI workflow planner. Each prompt is designed to create comprehensive automation flows that showcase different DeFi use cases.
+          These detailed prompts demonstrate the full capabilities of AgentPad&apos;s AI workflow planner. Each prompt is designed to create comprehensive automation flows that showcase different DeFi use cases.
         </p>
       </div>
 
@@ -1062,7 +1062,7 @@ The system should provide clear insights into portfolio performance and help tra
       <div>
         <h1 className="text-3xl font-bold text-white mb-4">Development Roadmap</h1>
         <p className="text-gray-300 mb-6">
-          AgentPad's development roadmap outlines our strategic vision and planned features across multiple quarters. This roadmap reflects our commitment to building the most comprehensive DeFi automation platform.
+          AgentPad&apos;s development roadmap outlines our strategic vision and planned features across multiple quarters. This roadmap reflects our commitment to building the most comprehensive DeFi automation platform.
         </p>
       </div>
 

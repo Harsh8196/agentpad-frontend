@@ -114,7 +114,7 @@ export default function DashboardPage() {
             <div className="flex items-center">
               <div className="w-2 h-2 bg-green-400 rounded-full mr-3"></div>
               <div>
-                <p className="text-sm font-medium text-white">Flow "Arbitrage Bot" executed successfully</p>
+                <p className="text-sm font-medium text-white">Flow &quot;Arbitrage Bot&quot; executed successfully</p>
                 <p className="text-xs text-gray-400">2 minutes ago</p>
               </div>
             </div>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
             <div className="flex items-center">
               <div className="w-2 h-2 bg-blue-400 rounded-full mr-3"></div>
               <div>
-                <p className="text-sm font-medium text-white">New flow "Yield Farming" created</p>
+                <p className="text-sm font-medium text-white">New flow &quot;Yield Farming&quot; created</p>
                 <p className="text-xs text-gray-400">15 minutes ago</p>
               </div>
             </div>
@@ -136,7 +136,7 @@ export default function DashboardPage() {
             <div className="flex items-center">
               <div className="w-2 h-2 bg-red-400 rounded-full mr-3"></div>
               <div>
-                <p className="text-sm font-medium text-white">Flow "Price Alert" failed execution</p>
+                <p className="text-sm font-medium text-white">Flow &quot;Price Alert&quot; failed execution</p>
                 <p className="text-xs text-gray-400">1 hour ago</p>
               </div>
             </div>
