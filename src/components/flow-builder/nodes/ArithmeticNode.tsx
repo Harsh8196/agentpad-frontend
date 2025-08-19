@@ -48,6 +48,9 @@ const ArithmeticNode: React.FC<ArithmeticNodeProps> = ({ data }) => {
         }`}>
           {data.status}
         </span>
+        {config?.outputVariable && (
+          <span className="text-[10px] text-gray-300">→ {config.outputVariable}</span>
+        )}
       </div>
       
       {/* Arithmetic output */}

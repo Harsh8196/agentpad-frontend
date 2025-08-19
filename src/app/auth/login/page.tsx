@@ -21,18 +21,13 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
     
-    console.log('Attempting login with:', { email, password: password ? '[HIDDEN]' : 'empty' });
-    
     try {
       const { data, error } = await signIn(email, password);
-      
-      console.log('Login response:', { data, error });
       
       if (error) {
         console.error('Login error:', error);
         setError(error.message);
       } else {
-        console.log('Login successful, redirecting to dashboard');
         router.push('/dashboard');
       }
     } catch (err) {

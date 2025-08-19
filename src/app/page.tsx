@@ -37,7 +37,9 @@ export default function Home() {
             </div>
             <h1 className="text-4xl md:text-6xl font-extrabold leading-tight">
               Build and run automated DeFi flows with
-              <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent"> AgentPad</span>
+              <div className="inline-block ml-2">
+                <img src="/agentpad-logo.svg" alt="AgentPad" className="h-12 md:h-16" />
+              </div>
             </h1>
             <p className="mt-4 text-gray-300 text-lg md:text-xl">
               Visual flows. LLM decisions. On-chain actions. Design strategies that execute themselves — safely and transparently.

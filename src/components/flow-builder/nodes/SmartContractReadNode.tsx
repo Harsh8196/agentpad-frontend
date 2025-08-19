@@ -48,7 +48,7 @@ const SmartContractReadNode: React.FC<SmartContractReadNodeProps> = ({ data }) =
       </div>
 
       {data.status && (
-        <div className="flex items-center justify-center mt-2">
+        <div className="flex items-center justify-between mt-2">
           <span className={`px-2 py-1 text-xs rounded-full ${
             data.status === 'success' ? 'bg-green-500/20 text-green-400' :
             data.status === 'error' ? 'bg-red-500/20 text-red-400' :
@@ -57,6 +57,9 @@ const SmartContractReadNode: React.FC<SmartContractReadNodeProps> = ({ data }) =
           }`}>
             {data.status}
           </span>
+          {data.config?.outputVariable && (
+            <span className="text-[10px] text-gray-300">→ {data.config.outputVariable}</span>
+          )}
         </div>
       )}
 

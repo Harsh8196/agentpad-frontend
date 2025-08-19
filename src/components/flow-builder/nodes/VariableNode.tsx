@@ -49,6 +49,9 @@ const VariableNode: React.FC<VariableNodeProps> = ({ data }) => {
         }`}>
           {data.status}
         </span>
+        {config?.variableName && (
+          <span className="text-[10px] text-gray-300">→ {config.variableName}</span>
+        )}
       </div>
       
       {/* Variable output */}

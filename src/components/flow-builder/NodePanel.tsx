@@ -138,16 +138,43 @@ const NodePanel: React.FC<NodePanelProps> = ({
   useEffect(() => {
     if (selectedNode) {
       const newConfig = selectedNode.data.config || {};
-      setConfig(newConfig);
+      // Normalize legacy/mismatched blockchain configs coming from AI planner
+      let normalizedConfig = { ...newConfig } as any;
+      if (selectedNode.type === 'blockchain') {
+        // Map deprecated tool names to supported ones
+        if (normalizedConfig.selectedTool === 'sei_get_balance') {
+          normalizedConfig.selectedTool = 'sei_erc20_balance';
+        }
+        // Rename parameter keys if needed
+        if (normalizedConfig.toolParameters && typeof normalizedConfig.toolParameters === 'object') {
+          if ('address' in normalizedConfig.toolParameters && !('contract_address' in normalizedConfig.toolParameters)) {
+            normalizedConfig.toolParameters.contract_address = normalizedConfig.toolParameters.address;
+            delete normalizedConfig.toolParameters.address;
+          }
+        }
+      }
+      setConfig(normalizedConfig);
       
       // Initialize blockchain state if it's a blockchain node
       if (selectedNode.type === 'blockchain') {
-        setBlockchainNetwork(newConfig.network || 'mainnet');
-        setBlockchainSelectedTool(newConfig.selectedTool || '');
-        setBlockchainToolParameters(newConfig.toolParameters || {});
+        setBlockchainNetwork(normalizedConfig.network || 'mainnet');
+        setBlockchainSelectedTool(normalizedConfig.selectedTool || '');
+        setBlockchainToolParameters(normalizedConfig.toolParameters || {});
+        // Persist normalization back to node data if any changes
+        if (JSON.stringify(normalizedConfig) !== JSON.stringify(newConfig)) {
+          onNodeDataChange(selectedNode.id, { config: normalizedConfig });
+        }
       }
+    } else {
+      // Clear state when no node is selected
+      setConfig({});
+      setBlockchainNetwork('mainnet');
+      setBlockchainSelectedTool('');
+      setBlockchainToolParameters({});
+      setParsedABI(null);
+      setSelectedMethod(null);
     }
-  }, [selectedNode]);
+  }, [selectedNode, onNodeDataChange]);
 
   // Parse ABI when config changes (for smart contract nodes)
   useEffect(() => {
@@ -174,34 +201,22 @@ const NodePanel: React.FC<NodePanelProps> = ({
 
   // Handle method selection when methodName changes
   useEffect(() => {
-    console.log('Method selection useEffect triggered:', {
-      methodName: config.methodName,
-      hasParsedABI: !!parsedABI,
-      isValid: parsedABI?.isValid,
-      nodeType: selectedNode?.type
-    });
-    
     if (parsedABI && parsedABI.isValid && config.methodName) {
       const methodType = selectedNode?.type === 'smartContractRead' ? 'readMethods' : 'writeMethods';
       const method = parsedABI[methodType].find((m: any) => m.name === config.methodName);
-      console.log('Found method in useEffect:', method);
       if (method) {
         setSelectedMethod(method);
       }
     } else if (!config.methodName) {
-      console.log('Clearing selected method');
       setSelectedMethod(null);
     }
   }, [config.methodName, parsedABI, selectedNode?.type]);
 
   const handleConfigChange = (key: string, value: any) => {
-    console.log('handleConfigChange', key, value);
     const newConfig = { ...config, [key]: value };
-    console.log('newConfig', newConfig);
     setConfig(newConfig);
     
     if (selectedNode) {
-      console.log('Calling onNodeDataChange with:', { config: newConfig });
       onNodeDataChange(selectedNode.id, { config: newConfig });
     }
   };
@@ -304,6 +319,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
       </div>
       
       <ValueSelector
+          resetKey={`conditional-value1-${selectedNode?.id}`}
           value={config.value1 || ''}
         onChange={(value) => handleConfigChange('value1', value)}
         variables={declaredVariables}
@@ -312,6 +328,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
       />
       
       <ValueSelector
+        resetKey={`conditional-value2-${selectedNode?.id}`}
         value={config.value2 || ''}
         onChange={(value) => handleConfigChange('value2', value)}
         variables={declaredVariables}
@@ -355,8 +372,9 @@ const NodePanel: React.FC<NodePanelProps> = ({
         </select>
       </div>
       
-      <ValueSelector
-          value={config.value1 || ''}
+            <ValueSelector
+        resetKey={`arithmetic-value1-${selectedNode?.id}`}
+        value={config.value1 || ''}
         onChange={(value) => handleConfigChange('value1', value)}
         variables={declaredVariables}
         expectedType="number"
@@ -365,6 +383,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
       />
       
       <ValueSelector
+        resetKey={`arithmetic-value2-${selectedNode?.id}`}
         value={config.value2 || ''}
         onChange={(value) => handleConfigChange('value2', value)}
         variables={declaredVariables}
@@ -427,6 +446,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
             Value
           </label>
           <ValueSelector
+            resetKey={`variable-value-${selectedNode?.id}`}
             value={config.value || ''}
             onChange={(value) => handleConfigChange('value', value)}
             variables={declaredVariables}
@@ -478,6 +498,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
             Condition
           </label>
           <ValueSelector
+            resetKey={`loop-condition-${selectedNode?.id}`}
             value={config.condition || ''}
             onChange={(value) => handleConfigChange('condition', value)}
             variables={declaredVariables}
@@ -494,6 +515,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
               Start Value
             </label>
             <ValueSelector
+              resetKey={`loop-start-${selectedNode?.id}`}
               value={config.startValue || ''}
               onChange={(value) => handleConfigChange('startValue', value)}
               variables={declaredVariables}
@@ -506,6 +528,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
               End Value
             </label>
             <ValueSelector
+              resetKey={`loop-end-${selectedNode?.id}`}
               value={config.endValue || ''}
               onChange={(value) => handleConfigChange('endValue', value)}
               variables={declaredVariables}
@@ -518,6 +541,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
               Step Value
             </label>
             <ValueSelector
+              resetKey={`loop-step-${selectedNode?.id}`}
               value={config.stepValue || '1'}
               onChange={(value) => handleConfigChange('stepValue', value)}
               variables={declaredVariables}
@@ -534,6 +558,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
             Collection/Array
           </label>
           <ValueSelector
+            resetKey={`loop-collection-${selectedNode?.id}`}
             value={config.collection || ''}
             onChange={(value) => handleConfigChange('collection', value)}
             variables={declaredVariables}
@@ -581,6 +606,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
       </div>
       
       <ValueSelector
+        resetKey={`timer-duration-${selectedNode?.id}`}
         value={config.duration?.toString() || '1000'}
         onChange={(value) => handleConfigChange('duration', parseInt(value) || 1000)}
         variables={declaredVariables}
@@ -613,6 +639,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
             Repeat Count
           </label>
           <ValueSelector
+            resetKey={`timer-repeat-${selectedNode?.id}`}
             value={config.repeatCount?.toString() || '-1'}
             onChange={(value) => handleConfigChange('repeatCount', parseInt(value) || -1)}
             variables={declaredVariables}
@@ -686,6 +713,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">Value (variable or text)</label>
         <ValueSelector
+          resetKey={`logger-value-${selectedNode?.id}`}
           value={config.value || ''}
           onChange={(value) => handleConfigChange('value', value)}
           variables={declaredVariables}
@@ -1067,6 +1095,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
                 )}
                 {param.type === 'string' && (
                   <ValueSelector
+                    resetKey={`blockchain-${param.name}-${selectedNode?.id}`}
                     value={blockchainToolParameters[param.name] || ''}
                     onChange={(value) => {
                       const newParams = { ...blockchainToolParameters, [param.name]: value };
@@ -1116,6 +1145,12 @@ const NodePanel: React.FC<NodePanelProps> = ({
                 )}
               </div>
             ))}
+            {/* Required parameters guardrail */}
+            {currentSchema.some((p: any) => p.required) && (
+              <div className="text-xs text-red-400 mt-2">
+                {currentSchema.some((p: any) => p.required && (!blockchainToolParameters[p.name] || String(blockchainToolParameters[p.name]).trim() === '')) && 'Missing required parameters. Please fill all fields marked with *.'}
+              </div>
+            )}
           </div>
         )}
         
@@ -1262,6 +1297,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
           Input
         </label>
         <ValueSelector
+          resetKey={`llm-input-${selectedNode?.id}`}
           value={config.input || ''}
           onChange={(value) => handleConfigChange('input', value)}
           variables={declaredVariables}
@@ -1366,7 +1402,6 @@ const NodePanel: React.FC<NodePanelProps> = ({
         <VariableDeclarationPanel
           variables={declaredVariables}
           onVariablesChange={(newVariables) => {
-            console.log('Start node variables changed:', newVariables);
             // Update the node's config with the new variables
             if (selectedNode) {
               const newConfig = {
@@ -1386,35 +1421,13 @@ const NodePanel: React.FC<NodePanelProps> = ({
 
   const renderTelegramConfig = () => (
     <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Bot Token
-        </label>
-        <input
-          type="text"
-          value={config.botToken || ''}
-          onChange={(e) => handleConfigChange('botToken', e.target.value)}
-          placeholder="Enter Telegram bot token"
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <p className="text-xs text-gray-400 mt-1">
-          Leave empty to use TELEGRAM_BOT_TOKEN environment variable
+      {/* Bot Token and Chat ID are handled by backend environment variables */}
+      <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
+        <p className="text-sm text-blue-300 mb-1">
+          <strong>Authentication:</strong> Handled by backend
         </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Chat ID
-        </label>
-        <input
-          type="text"
-          value={config.chatId || ''}
-          onChange={(e) => handleConfigChange('chatId', e.target.value)}
-          placeholder="Enter Telegram chat ID"
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <p className="text-xs text-gray-400 mt-1">
-          Leave empty to use TELEGRAM_CHAT_ID environment variable
+        <p className="text-xs text-blue-200/70">
+          Bot Token and Chat ID are configured via environment variables (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
         </p>
       </div>
 
@@ -1520,19 +1533,14 @@ const NodePanel: React.FC<NodePanelProps> = ({
 
   const renderUserApprovalConfig = () => (
     <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Approval Type
-        </label>
-        <select
-          value={config.approvalType || 'telegram'}
-          onChange={(e) => handleConfigChange('approvalType', e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="telegram">Telegram</option>
-          <option value="webhook">Webhook</option>
-          <option value="cli">CLI</option>
-        </select>
+      {/* Approval Type, Bot Token and Chat ID are handled by backend */}
+      <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
+        <p className="text-sm text-blue-300 mb-1">
+          <strong>Approval Method:</strong> Handled by backend
+        </p>
+        <p className="text-xs text-blue-200/70">
+          Uses Telegram for user approvals. Authentication configured via environment variables.
+        </p>
       </div>
 
       <div>
@@ -1643,6 +1651,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
           Output Variable
         </label>
         <ValueSelector
+          resetKey={`marketdata-outputVariable-${selectedNode?.id}`}
           value={config.outputVariable || ''}
           onChange={(value) => handleConfigChange('outputVariable', value)}
           placeholder="Select or enter variable name"
@@ -1667,14 +1676,11 @@ const NodePanel: React.FC<NodePanelProps> = ({
   const renderSmartContractReadConfig = () => {
 
     const handleMethodChange = (methodName: string) => {
-      console.log('handleMethodChange called with:', methodName);
       const method = parsedABI?.readMethods.find((m: any) => m.name === methodName);
-      console.log('Found method:', method);
       setSelectedMethod(method);
       
       // Update both methodName and parameters in a single config update
       const newConfig = { ...config, methodName, parameters: {} };
-      console.log('Updating config with methodName and reset parameters:', newConfig);
       setConfig(newConfig);
       
       if (selectedNode) {
@@ -1792,6 +1798,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
                     {input.name} ({input.type})
                   </label>
                   <ValueSelector
+                    resetKey={`smartcontractread-${input.name}-${selectedNode?.id}`}
                     value={config.parameters?.[input.name] || ''}
                     onChange={(value) => handleParameterChange(input.name, value)}
                     placeholder={`Enter ${input.type} value`}
@@ -1809,6 +1816,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
             Output Variable
           </label>
           <ValueSelector
+            resetKey={`smartcontractread-outputVariable-${selectedNode?.id}`}
             value={config.outputVariable || ''}
             onChange={(value) => handleConfigChange('outputVariable', value)}
             placeholder="Select or enter variable name"
@@ -1840,7 +1848,6 @@ const NodePanel: React.FC<NodePanelProps> = ({
       
       // Update both methodName and parameters in a single config update
       const newConfig = { ...config, methodName, parameters: {} };
-      console.log('Updating write config with methodName and reset parameters:', newConfig);
       setConfig(newConfig);
       
       if (selectedNode) {
@@ -1958,6 +1965,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
                     {input.name} ({input.type})
                   </label>
                   <ValueSelector
+                    resetKey={`smartcontractwrite-${input.name}-${selectedNode?.id}`}
                     value={config.parameters?.[input.name] || ''}
                     onChange={(value) => handleParameterChange(input.name, value)}
                     placeholder={`Enter ${input.type} value`}
@@ -2033,6 +2041,7 @@ const NodePanel: React.FC<NodePanelProps> = ({
             Output Variable
           </label>
           <ValueSelector
+            resetKey={`smartcontractwrite-outputVariable-${selectedNode?.id}`}
             value={config.outputVariable || ''}
             onChange={(value) => handleConfigChange('outputVariable', value)}
             placeholder="Select or enter variable name"

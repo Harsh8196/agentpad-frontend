@@ -11,13 +11,14 @@ interface VariableDeclaration {
 }
 
 interface ValueSelectorProps {
-  value: string;
+  value: string | number | boolean | null | undefined;
   onChange: (value: string) => void;
   variables: VariableDeclaration[];
   expectedType?: 'string' | 'number' | 'boolean' | 'array' | 'object';
   placeholder?: string;
   className?: string;
   label?: string;
+  resetKey?: string; // Use resetKey instead of key for forced re-initialization
 }
 
 const  ValueSelector: React.FC<ValueSelectorProps> = ({
@@ -28,6 +29,7 @@ const  ValueSelector: React.FC<ValueSelectorProps> = ({
   placeholder = "Enter value or select variable",
   className = "",
   label,
+  resetKey,
 }) => {
   const [inputMode, setInputMode] = useState<'constant' | 'variable'>('constant');
   const [constantValue, setConstantValue] = useState('');
@@ -35,28 +37,46 @@ const  ValueSelector: React.FC<ValueSelectorProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isInsertOpen, setIsInsertOpen] = useState(false);
   const [insertSearchTerm, setInsertSearchTerm] = useState('');
+  const [isInitialized, setIsInitialized] = useState(false);
+  const isTypingRef = useRef(false);
+  const lastValueRef = useRef(value);
 
-  // Initialize values based on current value
+  // Initialize values based on current value - only when resetKey changes or on mount
   useEffect(() => {
-    if (!value) {
-      setConstantValue('');
-      setVariableValue('');
-      setInputMode('constant');
-      return;
-    }
+    // Only update if value changed from outside (not during typing)
+    if (lastValueRef.current !== value && !isTypingRef.current) {
+      lastValueRef.current = value;
+      
+      if (!value) {
+        setConstantValue('');
+        setVariableValue('');
+        setInputMode('constant');
+        return;
+      }
 
-    // Check if it's a declared variable
-    const isDeclaredVariable = variables.some(v => v.name === value.trim());
-    if (isDeclaredVariable) {
-      setVariableValue(value.trim());
-      setConstantValue('');
-      setInputMode('variable');
-    } else {
-      setConstantValue(value);
-      setVariableValue('');
-      setInputMode('constant');
+      const valueStr = value?.toString() || '';
+      
+      // Check if it's a declared variable
+      const isDeclaredVariable = variables.some(v => v.name === valueStr.trim());
+      
+      if (isDeclaredVariable) {
+        setVariableValue(valueStr.trim());
+        setConstantValue('');
+        setInputMode('variable');
+      } else {
+        setConstantValue(valueStr);
+        setVariableValue('');
+        setInputMode('constant');
+      }
     }
-  }, [value, variables]);
+  }, [resetKey, variables, value]); // Include value to update when prop changes
+
+  // Reset initialization when resetKey changes (forced re-initialization)
+  useEffect(() => {
+    setIsInitialized(false);
+    isTypingRef.current = false;
+    lastValueRef.current = value; // Update ref when resetKey changes
+  }, [resetKey, value]);
 
   // Handle mode change
   const handleModeChange = (mode: 'constant' | 'variable') => {
@@ -70,8 +90,14 @@ const  ValueSelector: React.FC<ValueSelectorProps> = ({
 
   // Handle constant value change
   const handleConstantChange = (newValue: string) => {
+    isTypingRef.current = true;
     setConstantValue(newValue);
     onChange(newValue);
+    
+    // Reset typing flag after a short delay
+    setTimeout(() => {
+      isTypingRef.current = false;
+    }, 200);
   };
 
   // Build variable list for insert dropdown (always include objects so their properties are selectable)
@@ -110,9 +136,14 @@ const  ValueSelector: React.FC<ValueSelectorProps> = ({
 
   // Handle variable value change
   const handleVariableChange = (newValue: string) => {
-    console.log('handleVariableChange', newValue);
+    isTypingRef.current = true;
     setVariableValue(newValue);
     onChange(newValue);
+    
+    // Reset typing flag after a short delay
+    setTimeout(() => {
+      isTypingRef.current = false;
+    }, 200);
   };
 
   return (

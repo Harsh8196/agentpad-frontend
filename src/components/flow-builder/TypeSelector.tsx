@@ -50,7 +50,7 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
 
 
   const handleVariableSelect = (variableName: string, propertyPath?: string) => {
-    console.log('handleVariableSelect', variableName, propertyPath);
+
     const fullPath = propertyPath ? `${variableName}.${propertyPath}` : variableName;
     setInputValue(fullPath);
     onChange(fullPath);

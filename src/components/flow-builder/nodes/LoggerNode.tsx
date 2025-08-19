@@ -16,6 +16,7 @@ interface LoggerNodeProps {
 }
 
 const LoggerNode: React.FC<LoggerNodeProps> = ({ data }) => {
+  const config = data.config || {};
   return (
     <div className="bg-gray-800/50 border-2 border-gray-600 rounded-lg p-4 shadow-md min-w-[150px] backdrop-blur-sm">
       <Handle type="target" position={Position.Top} className="w-3 h-3" />
@@ -36,6 +37,9 @@ const LoggerNode: React.FC<LoggerNodeProps> = ({ data }) => {
         }`}>
           {data.status}
         </span>
+        {config?.outputVariable && (
+          <span className="text-[10px] text-gray-300">→ {config.outputVariable}</span>
+        )}
       </div>
       
       {/* Custom output */}

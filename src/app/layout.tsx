@@ -18,6 +18,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "AgentPad - AI Agent Builder",
   description: "Visual AI Agent Builder for DeFi and Blockchain",
+  icons: {
+    icon: '/agentpad-icon.svg',
+    shortcut: '/agentpad-icon.svg',
+    apple: '/agentpad-icon.svg',
+  },
 };
 
 export default function RootLayout({

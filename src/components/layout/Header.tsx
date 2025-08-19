@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Menu, 
   X, 
-  Bell,
-  Search
+  Bell
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -34,24 +33,11 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, isSidebarOpen }) => {
 
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">A</span>
-            </div>
-            <span className="text-xl font-bold text-white">AgentPad</span>
+            <img src="/agentpad-logo.svg" alt="AgentPad" className="h-8" />
           </Link>
         </div>
 
-        {/* Center - Search */}
-        <div className="flex-1 max-w-md mx-8">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search flows, blocks..."
-              className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200"
-            />
-          </div>
-        </div>
+        
 
         {/* Right side */}
         <div className="flex items-center space-x-2">

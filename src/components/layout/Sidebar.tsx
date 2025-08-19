@@ -10,6 +10,7 @@ import {
   Settings, 
   BarChart3, 
   BookOpen,
+  FileText,
   Plus,
   FolderOpen,
   Clock,
@@ -86,6 +87,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
       href: '/templates',
       icon: BookOpen,
       current: pathname === '/templates',
+    },
+    {
+      name: 'Documentation',
+      href: '/docs',
+      icon: FileText,
+      current: pathname === '/docs',
     },
     {
       name: 'Analytics',

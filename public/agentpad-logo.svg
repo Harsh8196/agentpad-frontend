@@ -1,0 +1,51 @@
+<svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gradient definitions -->
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Connected nodes icon -->
+  <g transform="translate(2, 2)">
+    <!-- Node 1 (top-left) -->
+    <circle cx="6" cy="6" r="2" fill="url(#logoGradient)"/>
+    <!-- Node 2 (middle-left) -->
+    <circle cx="6" cy="14" r="2" fill="url(#logoGradient)"/>
+    <!-- Node 3 (bottom-left) -->
+    <circle cx="6" cy="22" r="2" fill="url(#logoGradient)"/>
+    
+    <!-- Node 4 (top-right) -->
+    <circle cx="22" cy="6" r="2" fill="url(#logoGradient)"/>
+    <!-- Node 5 (middle-right) -->
+    <circle cx="22" cy="14" r="2" fill="url(#logoGradient)"/>
+    <!-- Node 6 (bottom-right) -->
+    <circle cx="22" cy="22" r="2" fill="url(#logoGradient)"/>
+    
+    <!-- Curved connections forming S-shape -->
+    <path d="M8 6 Q14 6 20 6" stroke="url(#logoGradient)" stroke-width="2" fill="none"/>
+    <path d="M8 14 Q14 14 20 14" stroke="url(#logoGradient)" stroke-width="2" fill="none"/>
+    <path d="M8 22 Q14 22 20 22" stroke="url(#logoGradient)" stroke-width="2" fill="none"/>
+    
+    <!-- Vertical connections -->
+    <path d="M6 8 L6 12" stroke="url(#logoGradient)" stroke-width="2" fill="none"/>
+    <path d="M22 8 L22 12" stroke="url(#logoGradient)" stroke-width="2" fill="none"/>
+    <path d="M6 16 L6 20" stroke="url(#logoGradient)" stroke-width="2" fill="none"/>
+    <path d="M22 16 L22 20" stroke="url(#logoGradient)" stroke-width="2" fill="none"/>
+    
+    <!-- Cross connections to complete the network -->
+    <path d="M8 6 Q14 10 20 14" stroke="url(#logoGradient)" stroke-width="1.5" fill="none" opacity="0.7"/>
+    <path d="M8 14 Q14 18 20 22" stroke="url(#logoGradient)" stroke-width="1.5" fill="none" opacity="0.7"/>
+    <path d="M8 22 Q14 18 20 14" stroke="url(#logoGradient)" stroke-width="1.5" fill="none" opacity="0.7"/>
+    <path d="M8 14 Q14 10 20 6" stroke="url(#logoGradient)" stroke-width="1.5" fill="none" opacity="0.7"/>
+  </g>
+  
+  <!-- Vertical separator -->
+  <line x1="32" y1="4" x2="32" y2="28" stroke="url(#logoGradient)" stroke-width="1"/>
+  
+  <!-- AgentPad text in one line -->
+  <text x="40" y="20" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="16" font-weight="600" fill="url(#logoGradient)" letter-spacing="-0.3">
+    AgentPad
+  </text>
+</svg>

@@ -10,7 +10,8 @@ import {
   Eye,
   EyeOff,
   X,
-  Maximize2
+  Maximize2,
+  Sparkles
 } from 'lucide-react';
 
 interface FlowToolbarProps {
@@ -26,6 +27,9 @@ interface FlowToolbarProps {
   isSaving?: boolean;
   validationErrors?: string[];
   onFitView?: () => void;
+  onOpenAIPlanner?: () => void;
+  onAddToTemplateLibrary?: () => void;
+  isAdmin?: boolean;
 }
 
 const FlowToolbar: React.FC<FlowToolbarProps> = ({
@@ -41,8 +45,11 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
   isSaving = false,
   validationErrors = [],
   onFitView,
+  onOpenAIPlanner,
+  onAddToTemplateLibrary,
+  isAdmin = false,
 }) => {
-  console.log('FlowToolbar props:', { currentFlowName, isNewFlow, isSaving });
+
   
   return (
     <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-3 backdrop-blur-sm">
@@ -94,6 +101,28 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
 
         {/* Right side - Actions */}
         <div className="flex items-center space-x-2">
+          {/* AI Planner */}
+          {onOpenAIPlanner && (
+            <button
+              onClick={onOpenAIPlanner}
+              className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-600/80 to-blue-600/80 text-white hover:from-purple-600 hover:to-blue-600"
+              title="Open AI Workflow Planner"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>AI Plan</span>
+            </button>
+          )}
+          
+          {/* Add to Template Library (Admin only) */}
+          {isAdmin && onAddToTemplateLibrary && (
+            <button
+              onClick={onAddToTemplateLibrary}
+              className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 transition-colors"
+              title="Add to Template Library"
+            >
+              <span>Add to Template Library</span>
+            </button>
+          )}
           {/* Delete selected */}
           {onDeleteSelected && (
             <button

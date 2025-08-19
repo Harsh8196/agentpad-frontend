@@ -19,6 +19,8 @@ import 'reactflow/dist/style.css';
 
 import BlockLibrary from './BlockLibrary';
 import FlowToolbar from './FlowToolbar';
+import AIWorkflowChat from './AIWorkflowChat';
+import { validateAndFixFlow } from '@/utils/flowValidation';
 import NodePanel from './NodePanel';
 import CustomNode from './nodes/CustomNode';
 import ConditionalNode from './nodes/ConditionalNode';
@@ -109,6 +111,7 @@ const FlowBuilder: React.FC = () => {
   const [isNewFlow, setIsNewFlow] = useState(true);
   const [availableVariables, setAvailableVariables] = useState<string[]>([]);
   const [declaredVariables, setDeclaredVariables] = useState<VariableDeclaration[]>([]);
+  const [isPlannerOpen, setIsPlannerOpen] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -400,6 +403,195 @@ const FlowBuilder: React.FC = () => {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  const applyPlannedFlow = useCallback((planned: { nodes: any[]; edges: any[] }) => {
+
+    // Default configs per node type to ensure fully configured nodes
+    const defaultConfigForType = (type: string) => {
+      switch (type) {
+        case 'start':
+          return { variables: [] };
+        case 'marketData':
+          return { symbol: 'sei', outputVariable: 'price' };
+        case 'arithmetic':
+          return { operation: 'add', value1: 0, value2: 0, outputVariable: 'result' };
+        case 'conditional':
+          return { operator: 'equals', value1: '', value2: '', outputVariable: '' };
+        case 'telegram':
+          return { message: 'Alert', interactive: false, buttons: [], outputVariable: '' };
+        case 'userApproval':
+          return { timeout: 300, message: 'Approve?', approvalActions: ['approve','reject'], outputVariable: 'approval' };
+        case 'blockchain':
+          return { network: 'mainnet', selectedTool: 'sei_get_balance', toolParameters: { address: 'sei1...' }, outputVariable: 'tx' };
+        case 'logger':
+          return { level: 'info', message: 'Log', value: '' };
+        case 'timer':
+          return { timerType: 'delay', duration: 1000, unit: 'ms', repeatCount: -1, timeoutAction: 'continue', outputVariable: '' };
+        case 'variable':
+          return { operation: 'set', variableName: '', value: '' };
+        case 'loop':
+          return { condition: '', maxIterations: 10 };
+        case 'llm':
+          return { outputMode: 'assistant', analysisType: 'general', network: 'mainnet', availableActions: '', systemPrompt: '', input: '', outputVariable: 'aiResult', model: 'gpt-4o-mini', temperature: 0 };
+        case 'smartContractRead':
+          return { network: 'sei', contractAddress: '', abi: '', methodName: '', parameters: {}, outputVariable: 'readResult' };
+        case 'smartContractWrite':
+          return { network: 'sei', contractAddress: '', abi: '', methodName: '', parameters: {}, gasLimit: '', gasPrice: '', value: '', waitForConfirmation: true, outputVariable: 'txHash' };
+        default:
+          return {};
+      }
+    };
+
+    const coerceNode = (n: any, idx: number): Node => {
+      const type = n.type;
+      const cfg = n.config || n.data?.config || {};
+      // Enforce strict schemas: drop unsupported fields
+      const sanitizedCfg = { ...cfg };
+      if (type === 'arithmetic' && 'expression' in sanitizedCfg) {
+        delete (sanitizedCfg as any).expression;
+      }
+      if (type === 'conditional' && 'condition' in sanitizedCfg) {
+        delete (sanitizedCfg as any).condition; // Use operator/value1/value2 instead
+      }
+      if (type === 'telegram') {
+        // Remove backend-handled fields
+        if ('botToken' in sanitizedCfg) delete (sanitizedCfg as any).botToken;
+        if ('chatId' in sanitizedCfg) delete (sanitizedCfg as any).chatId;
+      }
+      if (type === 'userApproval') {
+        // Remove backend-handled fields
+        if ('approvalType' in sanitizedCfg) delete (sanitizedCfg as any).approvalType;
+        if ('botToken' in sanitizedCfg) delete (sanitizedCfg as any).botToken;
+        if ('chatId' in sanitizedCfg) delete (sanitizedCfg as any).chatId;
+      }
+      if (type === 'blockchain') {
+        // Normalize legacy tool names/params from AI output
+        const scfg: any = sanitizedCfg;
+        if (scfg.selectedTool === 'sei_get_balance') {
+          scfg.selectedTool = 'sei_erc20_balance';
+        }
+        if (scfg.toolParameters && typeof scfg.toolParameters === 'object') {
+          if ('address' in scfg.toolParameters && !('contract_address' in scfg.toolParameters)) {
+            scfg.toolParameters.contract_address = scfg.toolParameters.address;
+            delete scfg.toolParameters.address;
+          }
+          // Promote literal placeholders into Start variables or mark empty to trigger validation
+          const ca = scfg.toolParameters.contract_address;
+          if (typeof ca === 'string' && /token.*address/i.test(ca)) {
+            // Use an empty string; validation will flag it
+            scfg.toolParameters.contract_address = '';
+          }
+        }
+      }
+      if (type === 'arithmetic') {
+        const coerceVal = (v: any) => {
+          if (v == null) return '';
+          const t = typeof v;
+          if (t === 'number' || t === 'string' || t === 'boolean') {
+            // Fix common AI mistake: blockchain balances are direct values, not objects
+            if (typeof v === 'string' && v.includes('.balance}')) {
+              const fixed = v.replace(/\{(\w+)\.balance\}/g, '$1');
+              console.warn('[AI SANITIZE] Fixed blockchain balance property access:', v, '→', fixed);
+              return fixed;
+            }
+            return v;
+          }
+          // If AI embedded an operation object, try to use its outputVariable; otherwise blank
+          if (v && typeof v === 'object') {
+            if (typeof (v as any).outputVariable === 'string') {
+              console.warn('[AI SANITIZE] Replacing nested arithmetic object with its outputVariable', v.outputVariable);
+              return (v as any).outputVariable;
+            }
+            console.warn('[AI SANITIZE] Clearing unsupported nested value in arithmetic node');
+            return '';
+          }
+          return '';
+        };
+        (sanitizedCfg as any).value1 = coerceVal((sanitizedCfg as any).value1);
+        (sanitizedCfg as any).value2 = coerceVal((sanitizedCfg as any).value2);
+      }
+      const mergedConfig = { ...defaultConfigForType(type), ...sanitizedCfg };
+      return {
+        id: n.id || `n${idx}`,
+        type,
+        position: n.position || { x: 100 + idx * 200, y: 200 },
+        data: {
+          label: n.data?.label || (type.charAt(0).toUpperCase() + type.slice(1)),
+          type,
+          config: mergedConfig,
+          description: n.data?.description || '',
+          status: 'idle',
+        },
+      };
+    };
+    const nextNodes: Node[] = planned.nodes.map(coerceNode);
+    const nextEdges: Edge[] = planned.edges.map((e: any, i: number) => ({
+      id: e.id || `e${i}`,
+      source: e.source || e.from, // Handle both source and from
+      target: e.target || e.to,   // Handle both target and to
+      type: e.type || 'default',
+      label: e.label || e.condition,
+      data: e.data,
+    }));
+    // Ensure Start node exists and variables declared include any placeholders used
+    const hasStart = nextNodes.some(n => n.type === 'start');
+    let nodesWithStart = nextNodes;
+    if (!hasStart) {
+      nodesWithStart = [
+        {
+          id: 'start-node',
+          type: 'start',
+          position: { x: 50, y: 200 },
+          data: { label: 'Start', type: 'start', config: { variables: [] }, description: 'Flow execution starts here', status: 'ready' },
+        } as unknown as Node,
+        ...nextNodes,
+      ];
+    }
+
+    // Scan for placeholders like {var} and add to start variables if missing
+    const placeholderRegex = /\{([a-zA-Z0-9_\.]+)\}/g;
+    const foundVars = new Set<string>();
+    nodesWithStart.forEach(n => {
+      const cfg = (n.data as any)?.config || {};
+      const scan = (val: any) => {
+        if (typeof val === 'string') {
+          let m;
+          while ((m = placeholderRegex.exec(val)) !== null) {
+            const key = m[1].split('.')[0];
+            if (key) foundVars.add(key);
+          }
+        } else if (Array.isArray(val)) {
+          val.forEach(scan);
+        } else if (val && typeof val === 'object') {
+          Object.values(val).forEach(scan);
+        }
+      };
+      scan(cfg);
+    });
+
+    nodesWithStart = nodesWithStart.map(n => {
+      if (n.type !== 'start') return n;
+      const existing = ((n.data as any)?.config?.variables as any[]) || [];
+      const existingNames = new Set(existing.map(v => v.name));
+      const toAdd = Array.from(foundVars).filter(v => !existingNames.has(v)).map(name => ({ name, type: 'string' }));
+      const updated = { ...n } as any;
+      updated.data = { ...n.data, config: { ...(n.data as any).config, variables: [...existing, ...toAdd] } };
+      return updated;
+    });
+
+    // Update variables state from the Start node
+    const startNode = nodesWithStart.find(n => n.type === 'start');
+    if (startNode?.data?.config?.variables) {
+      const variables = startNode.data.config.variables;
+      setDeclaredVariables(variables);
+      const variableNames = variables.map((v: any) => v.name);
+      setAvailableVariables(variableNames);
+    }
+    
+    setNodes(nodesWithStart);
+    setEdges(nextEdges);
+    setIsPlannerOpen(false);
+  }, [setNodes, setEdges]);
+
   // Update existing flow
   const handleUpdateFlow = useCallback(async () => {
     if (!user || !currentFlowId) {
@@ -486,16 +678,35 @@ const FlowBuilder: React.FC = () => {
 
     setIsSaving(true);
     try {
-    const flowData = {
-      nodes,
-      edges,
-      timestamp: new Date().toISOString(),
-    };
-    
+      const flowData = {
+        nodes,
+        edges,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Advanced flow validation and auto-fixing
+      const validation = validateAndFixFlow(flowData);
+      
+      let finalFlowData = flowData;
+      if (validation.warnings.length > 0) {
+        const warningMessage = `Flow issues detected and automatically fixed:\n\n${validation.warnings.join('\n')}\n\nSave the fixed version?`;
+        if (confirm(warningMessage)) {
+          finalFlowData = validation.fixedFlow!;
+        }
+      }
+      
+      if (validation.errors.length > 0) {
+        const errorMessage = `Critical flow errors found:\n\n${validation.errors.join('\n')}\n\nPlease fix these issues before saving.`;
+        alert(errorMessage);
+        setIsSaving(false);
+        return;
+      }
+      
       // Validate flow data
-      const result = flowSchema.safeParse(flowData);
+      const result = flowSchema.safeParse(finalFlowData);
       if (!result.success) {
         alert('Flow is invalid!\n' + JSON.stringify(result.error.issues, null, 2));
+        setIsSaving(false);
         return;
       }
 
@@ -505,7 +716,7 @@ const FlowBuilder: React.FC = () => {
           user_id: user.id,
           name: flowName.trim(),
           description: flowDescription.trim() || null,
-          flow_data: flowData
+          flow_data: finalFlowData
         })
         .select()
         .single();
@@ -545,7 +756,6 @@ const FlowBuilder: React.FC = () => {
 
   // Add new variable to available variables and declared variables
   const addVariable = useCallback((variableName: string) => {
-    console.log('FlowBuilder addVariable called:', variableName);
     if (!availableVariables.includes(variableName)) {
       setAvailableVariables(prev => [...prev, variableName]);
     }
@@ -559,7 +769,7 @@ const FlowBuilder: React.FC = () => {
         description: `Variable ${variableName}`
       };
       
-      console.log('Adding new variable to declaredVariables:', newVariable);
+  
       setDeclaredVariables(prev => [...prev, newVariable]);
       
       // Update the Start node's config with the new variable
@@ -583,7 +793,6 @@ const FlowBuilder: React.FC = () => {
   }, [availableVariables, declaredVariables, setNodes]);
 
   const handleVariablesChange = useCallback((variables: VariableDeclaration[]) => {
-    console.log('FlowBuilder handleVariablesChange called:', variables);
     setDeclaredVariables(variables);
     // Update available variables list from declared variables
     const variableNames = variables.map(v => v.name);
@@ -630,14 +839,50 @@ const FlowBuilder: React.FC = () => {
   // Load flow on component mount
   useEffect(() => {
     try {
+      // Check for template parameter in URL first
+      const urlParams = new URLSearchParams(window.location.search);
+      const templateParam = urlParams.get('template');
+      const templateName = urlParams.get('name');
+      
+      if (templateParam) {
+        try {
+          const templateData = JSON.parse(decodeURIComponent(templateParam));
+
+          
+          setNodes(templateData.nodes || []);
+          setEdges(templateData.edges || []);
+          setCurrentFlowId(null);
+          setCurrentFlowName(templateName || 'Template Flow');
+          setFlowName(templateName || 'Template Flow');
+          setFlowDescription('');
+          setIsNewFlow(true);
+          
+          // Extract variables from template
+          const variables = extractVariablesFromFlow(templateData.nodes || []);
+          setAvailableVariables(variables);
+          
+          // Load declared variables from Start node
+          const startNode = templateData.nodes?.find((node: any) => node.type === 'start');
+          if (startNode?.data?.config?.variables) {
+            setDeclaredVariables(startNode.data.config.variables);
+            // Also update available variables from declared variables
+            const variableNames = startNode.data.config.variables.map((v: VariableDeclaration) => v.name);
+            setAvailableVariables(variableNames);
+          }
+          
+          // Clear URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          return; // Don't proceed with localStorage loading
+        } catch (error) {
+          console.error('Error loading template from URL:', error);
+        }
+      }
+      
       const selectedFlow = localStorage.getItem('selectedFlow');
-      console.log('Selected flow from localStorage:', selectedFlow);
       
       if (selectedFlow) {
         const flow = JSON.parse(selectedFlow);
-        console.log('Parsed flow data:', flow);
-        console.log('Flow name:', flow.name);
-        console.log('Flow ID:', flow.id);
         
         setNodes(flow.flow_data.nodes || []);
         setEdges(flow.flow_data.edges || []);
@@ -660,11 +905,8 @@ const FlowBuilder: React.FC = () => {
           setAvailableVariables(variableNames);
         }
         
-        console.log('Set currentFlowName to:', flow.name);
-        console.log('Set isNewFlow to: false');
         // Do NOT remove from localStorage here
       } else {
-        console.log('No flow selected, setting up new flow');
         // No flow selected, this is a new flow
         setIsNewFlow(true);
         setCurrentFlowId(null);
@@ -863,12 +1105,30 @@ const FlowBuilder: React.FC = () => {
       edges,
       timestamp: new Date().toISOString(),
     };
-    const result = flowSchema.safeParse(flowData);
+
+    // Advanced flow validation and auto-fixing
+    const validation = validateAndFixFlow(flowData);
+    
+    let finalFlowData = flowData;
+    if (validation.warnings.length > 0) {
+      const warningMessage = `Flow issues detected and automatically fixed:\n\n${validation.warnings.join('\n')}\n\nDownload the fixed version?`;
+      if (confirm(warningMessage)) {
+        finalFlowData = validation.fixedFlow!;
+      }
+    }
+    
+    if (validation.errors.length > 0) {
+      const errorMessage = `Critical flow errors found:\n\n${validation.errors.join('\n')}\n\nPlease fix these issues before downloading.`;
+      alert(errorMessage);
+      return;
+    }
+
+    const result = flowSchema.safeParse(finalFlowData);
     if (!result.success) {
       alert('Flow is invalid!\n' + JSON.stringify(result.error.issues, null, 2));
       return;
     }
-    const blob = new Blob([JSON.stringify(flowData, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(finalFlowData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -970,18 +1230,11 @@ const FlowBuilder: React.FC = () => {
             isSaving={isSaving}
             validationErrors={validateNodeConfigurations()}
             onFitView={onFitView}
+            onOpenAIPlanner={() => setIsPlannerOpen(true)}
+            onAddToTemplateLibrary={onAddToTemplateLibrary}
+            isAdmin={user?.user_metadata?.role === 'admin'}
           />
-          {/* Admin-only: Add to Template Library */}
-          {user?.user_metadata?.role === 'admin' && (
-            <div className="p-4">
-              <button
-                onClick={onAddToTemplateLibrary}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Add to Template Library
-              </button>
-            </div>
-          )}
+
 
           {/* Save Flow Dialog */}
           {showSaveDialog && (
@@ -1079,6 +1332,13 @@ const FlowBuilder: React.FC = () => {
         availableVariables={availableVariables}
         declaredVariables={declaredVariables}
         onVariablesChange={handleVariablesChange}
+      />
+
+      {/* AI Planner Drawer */}
+      <AIWorkflowChat
+        isOpen={isPlannerOpen}
+        onClose={() => setIsPlannerOpen(false)}
+        onApplyFlow={applyPlannedFlow}
       />
     </div>
   );
