@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit, Trash2, Play, Calendar, User } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
-import { useAuthContext } from '../../../components/auth/AuthProvider';
+import { useAuthContext } from '../../components/auth/AuthProvider';
 
 interface Flow {
   id: string;

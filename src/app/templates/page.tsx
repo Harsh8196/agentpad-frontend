@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
-import { useAuthContext } from '../../../components/auth/AuthProvider';
+import { useAuthContext } from '../../components/auth/AuthProvider';
 import { 
   BookOpen, 
   Download, 
@@ -85,7 +85,7 @@ export default function TemplatesPage() {
   };
 
   const handleDeleteTemplate = async (templateId: string) => {
-    if (!user?.user_metadata?.role === 'admin') {
+    if (user?.user_metadata?.role !== 'admin') {
       alert('Only admins can delete templates');
       return;
     }

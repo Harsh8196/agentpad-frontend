@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Check } from 'lucide-react';
-import { useAuthContext } from '../../../../components/auth/AuthProvider';
+import { useAuthContext } from '../../../components/auth/AuthProvider';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({

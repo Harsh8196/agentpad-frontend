@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Header from './Header';
 import Sidebar from './Sidebar';
-import ProtectedRoute from '../../../components/auth/ProtectedRoute';
+import ProtectedRoute from '../auth/ProtectedRoute';
 
 interface LayoutProps {
   children: React.ReactNode;

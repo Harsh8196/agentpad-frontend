@@ -19,7 +19,7 @@ import {
   User,
   LogOut
 } from 'lucide-react';
-import { useAuthContext } from '../../../components/auth/AuthProvider';
+import { useAuthContext } from '../auth/AuthProvider';
 
 interface SidebarProps {
   isOpen: boolean;

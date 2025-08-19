@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Layout from "../components/layout/Layout";
-import { AuthProvider } from "../../components/auth/AuthProvider";
+import { AuthProvider } from "../components/auth/AuthProvider";
 import HydrationSuppressor from "../components/HydrationSuppressor";
 
 const geistSans = Geist({
