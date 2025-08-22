@@ -162,17 +162,17 @@ export default function LoginPage() {
           </button>
 
           {/* Divider */}
-          <div className="relative">
+          {/* <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-700" />
             </div>
             <div className="relative flex justify-center text-sm">
               <span className="px-4 bg-gradient-to-br from-gray-900 via-gray-800 to-black text-gray-400">Or continue with</span>
             </div>
-          </div>
+          </div> */}
 
           {/* Social Login Buttons */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-2 gap-4">
             <button
               type="button"
               className="w-full inline-flex justify-center py-3 px-4 border border-gray-700 rounded-xl shadow-sm bg-gray-800/50 text-sm font-medium text-gray-300 hover:bg-gray-700/50 backdrop-blur-sm transition-all duration-200"
@@ -194,7 +194,7 @@ export default function LoginPage() {
               </svg>
               <span className="ml-2">Twitter</span>
             </button>
-          </div>
+          </div> */}
 
           {/* Sign up link */}
           <div className="text-center">
